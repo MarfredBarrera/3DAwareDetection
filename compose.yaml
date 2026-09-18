@@ -1,0 +1,44 @@
+services:
+  dev:
+    image: 3d-aware:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        BUILD_JOBS: ${BUILD_JOBS:-4}
+    user: ${CONTAINER_USER:-0:0}
+    working_dir: /workspace
+    init: true
+    stdin_open: true
+    tty: true
+    shm_size: 8gb
+    ports:
+      - "${WEB_PORT:-7860}:7860"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
+      EGL_PLATFORM: surfaceless
+      HOME: /data/home
+      HF_HOME: /data/cache/huggingface
+      TORCH_HOME: /data/cache/torch
+      XDG_CACHE_HOME: /data/cache
+      CPU_LIMIT: ${CPU_LIMIT:-200}
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-2}
+      MKL_NUM_THREADS: ${MKL_NUM_THREADS:-2}
+      OPENBLAS_NUM_THREADS: ${OPENBLAS_NUM_THREADS:-2}
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - .:/workspace
+      # Make the environment wrapper available immediately without rebuilding.
+      - ./docker/sam3d-env:/usr/local/bin/sam3d-env:ro
+      - ${DATA_DIR:-./data}:/data
+      - ${OUTPUT_DIR:-./outputs}:/outputs
+      # Objaverse slice on the NAS; read-only, the harness never writes here.
+      - ${OBJAVERSE_DIR:-/ICONAS/users/marfred/objaverse}:/data/objaverse_nas:ro
+    command: [bash]

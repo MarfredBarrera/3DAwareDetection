@@ -1,0 +1,9 @@
+.git
+.agents
+.codex
+.env
+data
+outputs
+build-logs
+**/__pycache__
+.pytest_cache

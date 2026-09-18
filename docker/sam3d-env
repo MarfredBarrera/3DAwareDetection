@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+name=${1:-core}
+case "$name" in
+  core|sam3d) ;;
+  *) echo 'Usage: sam3d-env {core|sam3d} [command ...]' >&2; exit 2 ;;
+esac
+if [ "$#" -gt 0 ]; then shift; fi
+export PATH="/opt/envs/$name/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export CONDA_PREFIX="/opt/envs/$name"
+export PYTHONPATH=/workspace
+export PYTHONNOUSERSITE=1
+export ACTIVE_ENV="$name"
+if [ "$name" = core ]; then
+  export CUDA_HOME=/usr/local/cuda
+else
+  export CUDA_HOME=/usr/local/cuda-12.1
+fi
+export PATH="$CUDA_HOME/bin:$PATH"
+export LD_LIBRARY_PATH="$CUDA_HOME/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64"
+if [ "$name" = sam3d ]; then
+  export PYTHONPATH="/workspace:/opt/src/fast-sam3d/notebook"
+  export LIDRA_SKIP_INIT=true
+
+  # Older images predate the portability patch below. Repair them on
+  # first use so Compose can run the renamed wrapper without an image rebuild.
+  dino_source=/opt/src/dinov2
+  dino_module=/opt/envs/sam3d/lib/python3.11/site-packages/sam3d_objects/model/backbone/dit/embedder/dino.py
+  if [ ! -f "$dino_source/hubconf.py" ]; then
+    git clone --depth 1 https://github.com/facebookresearch/dinov2.git "$dino_source"
+    git -C "$dino_source" fetch --depth 1 origin 7764ea0f912e53c92e82eb78a2a1631e92725fc8
+    git -C "$dino_source" checkout --detach 7764ea0f912e53c92e82eb78a2a1631e92725fc8
+  fi
+  if [ -f "$dino_module" ] && grep -q '/data3/wmq/Fast-sam3d-objects' "$dino_module"; then
+    python - "$dino_module" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+source = path.read_text()
+source = source.replace(
+    "/data3/wmq/Fast-sam3d-objects/checkpoints/torch-cache/hub/facebookresearch_dinov2_main",
+    "/opt/src/dinov2",
+)
+source = source.replace("backbone_kwargs = {}", 'backbone_kwargs = {"pretrained": False}')
+path.write_text(source)
+PY
+  fi
+fi
+if [ "$#" = 0 ]; then exec bash --norc; fi
+if [ -n "${CPU_LIMIT:-}" ] && command -v cpulimit >/dev/null 2>&1; then
+  # Attach to this PID before exec: foreground cpulimit discards the child's
+  # exit status, which would hide worker failures from main.py.
+  cpulimit -b -z -l "$CPU_LIMIT" -p "$$"
+elif [ -n "${CPU_LIMIT:-}" ]; then
+  echo 'sam3d-env: cpulimit is unavailable; continuing without a CPU limit' >&2
+fi
+exec "$@"

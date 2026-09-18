@@ -1,0 +1,14 @@
+# Use with: docker compose -f compose.yaml -f compose.rootless.yaml ...
+# Configure the user Docker daemon's cdi-spec-dirs to a freshly generated,
+# user-owned CDI directory before starting this service.
+services:
+  dev:
+    deploy:
+      resources:
+        reservations:
+          devices: !reset []
+    runtime: runc
+    devices:
+      - "nvidia.com/gpu=all"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: void
