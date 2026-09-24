@@ -75,6 +75,9 @@ off-center translations, and writes RGB/masks/depth with searchable metadata.
 - `reconstruction/`: SAM3 segmentation, SAM3D inference, rendering/viewer.
 - `harness/`: Objaverse canonicalization and controlled viewpoint/occlusion data.
   See [harness/README.md](harness/README.md).
+- `experiments/viewpoint_sensitivity/`: balanced multi-view SAM3 recognition and
+  paper-style top-1 accuracy heatmaps. See its
+  [README](experiments/viewpoint_sensitivity/README.md).
 - `docker/`: pinned model environments and upstream compatibility patches.
 
 The two model environments are necessary: SAM3 and Fast-SAM3D use incompatible

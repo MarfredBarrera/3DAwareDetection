@@ -1,0 +1,19 @@
+# Optional stress-test views; keep separate from the realistic-view experiment.
+output_dir: ../../outputs/viewpoint-sensitivity-upright-extreme
+gpu_id: 3
+root: /data/objaverse_nas
+canonical: ../../outputs/viewpoint-sensitivity-upright/canonical.json
+require_upright_verified: true
+use_reviewed_cohort: true
+categories: [chair, sofa, table, bed, lamp, bookcase, desk, stool, cabinet, vase, toilet, bench]
+objects_per_category: 10
+azimuths: [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
+elevations: [-60, -30, 75, 82.5]
+distance: 2.2
+image_size: 320
+detection:
+  score_threshold: 0.5
+  iou_threshold: 0.5
+sam3d_collection:
+  viewpoints_per_band: 3
+checkpoint: /data/checkpoints/sam3/sam3.pt

@@ -1,12 +1,12 @@
-image: outputs/smoke3/object-000/views/004.png
-query: couch
-output_dir: outputs/smoke3
+image: outputs/viewpoint-sensitivity-upright/sam3d_inputs/bench/9aecdbb725e84a1ab77642aa7767b383/low_accuracy/viewpoint_(azimuth_270_elevation_0)/rgb.png
+query: desk
+output_dir: outputs/sam3d_correction
 # Docker exposes all GPUs; each worker uses this host GPU index as cuda:0.
 gpu_id: 3
 
 preprocessing:
   checkpoint: /data/checkpoints/sam3/sam3.pt
-  threshold: 0.2
+  threshold: 0.3
   max_masks: 1
   # ApexNav's decision-frame depth is aligned with the 640x480 RGB image.
   # The simulator uses a 79-degree horizontal FOV.

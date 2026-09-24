@@ -7,6 +7,23 @@ import numpy as np
 
 @unittest.skipUnless(importlib.util.find_spec("pytorch3d"), "requires sam3d environment")
 class HarnessTests(unittest.TestCase):
+    def test_balanced_object_selection(self):
+        from harness.build_dataset import select_uids
+        objects = {
+            "c1": {"category": "chair"}, "c2": {"category": "chair"},
+            "c3": {"category": "chair"}, "s1": {"category": "sofa"},
+            "s2": {"category": "sofa"},
+        }
+        pool = ["c2", "s1", "c1", "s2", "c3"]
+        self.assertEqual(
+            select_uids(pool, objects, limit=1, objects_per_category=2,
+                        categories=["chair", "sofa"]),
+            ["c2", "c1", "s1", "s2"],
+        )
+        with self.assertRaisesRegex(ValueError, "sofa=2"):
+            select_uids(pool, objects, limit=1, objects_per_category=3,
+                        categories=["chair", "sofa"])
+
     def test_fractional_view_names_are_distinct(self):
         from harness.build_dataset import sample_id
         self.assertNotEqual(sample_id(0.1, 20, 0.15), sample_id(0.9, 20, 0.15))

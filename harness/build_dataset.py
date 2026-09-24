@@ -19,6 +19,29 @@ from harness.meshio import ObjaverseStore
 from harness.render import Harness
 
 
+def select_uids(pool, objects, *, limit, objects_per_category=None, categories=None):
+    """Select either a global prefix or a balanced prefix for every category.
+
+    ``pool`` is expected to have already been shuffled, so this helper is both
+    deterministic for a seeded caller and independent of dictionary ordering.
+    """
+    if objects_per_category is None:
+        return pool[:limit]
+    grouped = {}
+    for uid in pool:
+        grouped.setdefault(objects[uid]["category"], []).append(uid)
+    expected = sorted(categories if categories is not None else grouped)
+    short = {category: len(grouped.get(category, [])) for category in expected
+             if len(grouped.get(category, [])) < objects_per_category}
+    if short:
+        detail = ", ".join(f"{category}={count}" for category, count in short.items())
+        raise ValueError(
+            f"not enough eligible objects for --objects-per-category="
+            f"{objects_per_category}: {detail}")
+    return [uid for category in expected
+            for uid in grouped[category][:objects_per_category]]
+
+
 def save_png(t: torch.Tensor, path: str) -> None:
     from PIL import Image
     a = t.detach().cpu().numpy()
@@ -42,6 +65,8 @@ def main() -> None:
     p.add_argument("--out", default="/outputs/viewocc")
     p.add_argument("--categories", nargs="*", default=None)
     p.add_argument("--limit", type=int, default=20, help="objects to render")
+    p.add_argument("--objects-per-category", type=int, default=None,
+                   help="balanced category sample; overrides the global --limit")
     p.add_argument("--azimuths", type=float, nargs="*",
                    default=[0, 45, 90, 135, 180, 225, 270, 315])
     p.add_argument("--elevations", type=float, nargs="*", default=[0, 20, 40])
@@ -58,14 +83,18 @@ def main() -> None:
                    help="skip heavy meshes; the slice runs to 211 MiB at the tail")
     p.add_argument("--min-azimuth-confidence", type=float, default=0.0)
     p.add_argument("--exclude-up-suspect", action="store_true")
+    p.add_argument("--require-upright-verified", action="store_true",
+                   help="refuse objects without explicit upright review")
     p.add_argument("--save-depth", action="store_true")
     p.add_argument("--sweep-steps", type=int, default=13)
     p.add_argument("--tolerance", type=float, default=0.03)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", default="cuda")
     args = p.parse_args()
-    if args.limit < 1 or args.image_size < 16 or args.sweep_steps < 2:
-        p.error("limit >= 1, image-size >= 16, and sweep-steps >= 2 are required")
+    if (args.limit < 1 or args.image_size < 16 or args.sweep_steps < 2
+            or (args.objects_per_category is not None and args.objects_per_category < 1)):
+        p.error("limit, objects-per-category >= 1; image-size >= 16; "
+                "sweep-steps >= 2 are required")
     if not args.occlusion_levels or any(not 0 <= level < 1 for level in args.occlusion_levels):
         p.error("occlusion-levels must be in [0, 1)")
     if not 0 < args.along < 1 or args.distance <= 0 or args.occluder_scale <= 0:
@@ -88,7 +117,15 @@ def main() -> None:
     if not pool:
         raise SystemExit("no objects matched the filters")
     rng.shuffle(pool)
-    chosen = pool[: args.limit]
+    chosen = select_uids(pool, store.objects, limit=args.limit,
+                         objects_per_category=args.objects_per_category,
+                         categories=args.categories)
+    if args.require_upright_verified:
+        unverified = [uid for uid in chosen
+                      if store.objects[uid].get("upright_verification", {}).get("status")
+                      != "verified"]
+        if unverified:
+            raise ValueError(f"Objects need upright verification: {unverified}")
     occ_pool = store.uids(max_faces=min(args.max_faces, 150_000))
     positive_levels = [level for level in args.occlusion_levels if level > 0]
 
@@ -144,6 +181,10 @@ def main() -> None:
                                    files=dict(rgb=f"samples/{uid}/{sid}.rgb.png",
                                               amodal=f"samples/{uid}/{sid}.amodal.png",
                                               modal=f"samples/{uid}/{sid}.modal.png"))
+                        if "upright_verification" in store.objects[uid]:
+                            rec["upright_verification"] = store.objects[uid]["upright_verification"]
+                            rec["semantic_front_verified"] = store.objects[uid]["semantic_front_verified"]
+                            rec["view_regime"] = "realistic" if 0 <= elev <= 60 else "extreme"
                         if args.save_depth:
                             rec["files"]["depth"] = f"samples/{uid}/{sid}.depth.npy"
                         index.write(json.dumps(rec) + "\n")

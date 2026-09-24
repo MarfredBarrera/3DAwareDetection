@@ -5,8 +5,13 @@ import numpy as np
 from PIL import Image
 
 
-def render_turntable(gaussian, render_video, output_dir, views=8, resolution=512):
-    """Render orbiting RGB views and write `views/*.png` plus `turntable.gif`."""
+def render_turntable(gaussian, render_video, output_dir, views=8, resolution=512,
+                     bg_color=(1.0, 1.0, 1.0)):
+    """Render orbiting RGB views and write `views/*.png` plus `turntable.gif`.
+
+    ``bg_color`` is the background the splat is composited over, in [0, 1] RGB
+    (the renderer's native scale); it defaults to white.
+    """
     if views < 2:
         raise ValueError("views must be at least 2")
     if resolution < 64:
@@ -18,6 +23,7 @@ def render_turntable(gaussian, render_video, output_dir, views=8, resolution=512
         gaussian,
         num_frames=views,
         resolution=resolution,
+        bg_color=bg_color,
         r=1,
         fov=60,
         pitch_deg=15,

@@ -1,0 +1,1674 @@
+{
+  "schema_version": 1,
+  "coordinate_frame": "vectors in the original canonical frame",
+  "objects": {
+    "3603cf85c49e4323a93b62db0258b36f": {
+      "category": "bed",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        -1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bed.png row 0 and candidates/bed.png row 0. Mattress above supporting frame; headboard above mattress. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "3d118a9fd6e34ddab99cb0fab5540682": {
+      "category": "bed",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bed.png row 1 and candidates/bed.png row 1. Mattress above supporting frame; headboard above mattress. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "5d3a99865ac84d8a8bf06b263aa5bb55": {
+      "category": "bed",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bed.png row 2 and candidates/bed.png row 2. Mattress above supporting frame; headboard above mattress. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "5dbfe3c5798445a5bdff4efca0b943a2": {
+      "category": "bed",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bed.png row 3 and candidates/bed.png row 3. Mattress above supporting frame; headboard above mattress. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "6251708b41514ee6b4fec0e3955c4b69": {
+      "category": "bed",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        -1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bed.png row 4 and candidates/bed.png row 4. Mattress above supporting frame; headboard above mattress. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "a12d3ae76e3944428f14e5b15d4f0efd": {
+      "category": "bed",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bed.png row 5 and candidates/bed.png row 5. Mattress above supporting frame; headboard above mattress. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "a2b2645701c94fa49e65661806219c6b": {
+      "category": "bed",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bed.png row 6 and candidates/bed.png row 6. Mattress above supporting frame; headboard above mattress. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "b547d81073b64d3e97200fd3ae9a74af": {
+      "category": "bed",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bed.png row 7 and candidates/bed.png row 7. Mattress above supporting frame; headboard above mattress. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "dda2613eb5c04527a325a3b0bce9f79c": {
+      "category": "bed",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bed.png row 8 and candidates/bed.png row 8. Mattress above supporting frame; headboard above mattress. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "ea5d7b8656c74af3843a5fcb34c30d21": {
+      "category": "bed",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bed.png row 9 and candidates/bed.png row 9. Mattress above supporting frame; headboard above mattress. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "118e358d76a642329b51c5cdd2ffc1c6": {
+      "category": "bench",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bench.png row 0 and candidates/bench.png row 0. Seat above supports and backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "6e9a71be6fb64785b09f2a4bbf2abcdf": {
+      "category": "bench",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bench.png row 1 and candidates/bench.png row 1. Seat above supports and backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "7a0c2a659e2441b6b568a9d2acf8419e": {
+      "category": "bench",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bench.png row 2 and candidates/bench.png row 2. Seat above supports and backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "9ab88889b9f84d7384c6f3bbab7982f5": {
+      "category": "bench",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bench.png row 3 and candidates/bench.png row 3. Seat above supports and backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "9aecdbb725e84a1ab77642aa7767b383": {
+      "category": "bench",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bench.png row 4 and candidates/bench.png row 4. Seat above supports and backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "9ef388cd9cb947f48957a497e8b8184a": {
+      "category": "bench",
+      "status": "excluded",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bench.png row 5 and candidates/bench.png row 5. Seat above supports and backrest above seat. Rejected after corrected four-view audit: Corrected side views retain an ambiguous tilted seat/support frame.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "addb92302c0141f5b52b48b06e359f7c": {
+      "category": "bench",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bench.png row 6 and candidates/bench.png row 6. Seat above supports and backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "b4f1456bb3be4a02a78046e218fdac2a": {
+      "category": "bench",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bench.png row 7 and candidates/bench.png row 7. Seat above supports and backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "e59b9d14b7dd4407a94b0ef2baefd19e": {
+      "category": "bench",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bench.png row 8 and candidates/bench.png row 8. Seat above supports and backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "e7c90c3d242b463d9f7346ac39742105": {
+      "category": "bench",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bench.png row 9 and candidates/bench.png row 9. Seat above supports and backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "08d73e1168504bf2b8706cd838ad16ef": {
+      "category": "bookcase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/bookcase.png row 0 and candidates/bookcase.png row 0. Shelves horizontal, base below shelving. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "2b808687faa541dcb5a1987cea250c73": {
+      "category": "bookcase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        -1
+      ],
+      "evidence": "Visual review of audit-before/bookcase.png row 1 and candidates/bookcase.png row 1. Shelves horizontal, base below shelving. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "37a029f9ea184950a62b309f62ab6476": {
+      "category": "bookcase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        -1
+      ],
+      "evidence": "Visual review of audit-before/bookcase.png row 2 and candidates/bookcase.png row 2. Shelves horizontal, base below shelving. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "66b83fb8729948e9955cac4754ccd132": {
+      "category": "bookcase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bookcase.png row 3 and candidates/bookcase.png row 3. Shelves horizontal, base below shelving. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "67e718a0fc904487a9f735892d9834d3": {
+      "category": "bookcase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        -1
+      ],
+      "evidence": "Visual review of audit-before/bookcase.png row 4 and candidates/bookcase.png row 4. Shelves horizontal, base below shelving. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "68baafb344b2445a8e7f4917b6fe8a63": {
+      "category": "bookcase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        -1
+      ],
+      "evidence": "Visual review of audit-before/bookcase.png row 5 and candidates/bookcase.png row 5. Shelves horizontal, base below shelving. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "72e0e0b03dec42dbbb67ae0d5b9ff0b0": {
+      "category": "bookcase",
+      "status": "verified",
+      "up": [
+        -1,
+        0,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bookcase.png row 6 and candidates/bookcase.png row 6. Shelves horizontal, base below shelving. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "8c18d26983f2457b9377ebbe66a4c8aa": {
+      "category": "bookcase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/bookcase.png row 7 and candidates/bookcase.png row 7. Shelves horizontal, base below shelving. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "97c1c0c9ec6e49b993b37efca14fa830": {
+      "category": "bookcase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        -1
+      ],
+      "evidence": "Visual review of audit-before/bookcase.png row 8 and candidates/bookcase.png row 8. Shelves horizontal, base below shelving. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "b37db59c7cce46b2a3e40969e6797117": {
+      "category": "bookcase",
+      "status": "excluded",
+      "up": null,
+      "front": null,
+      "evidence": "Visual review of audit-before/bookcase.png row 9 and candidates/bookcase.png row 9. Slanted/partial asset; no confidently upright cardinal candidate.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "030019585a6e4f79bbc3d7c10a3a31db": {
+      "category": "cabinet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        -1
+      ],
+      "evidence": "Visual review of audit-before/cabinet.png row 0 and candidates/cabinet.png row 0. Cabinet doors/shelves vertical and base below body. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "18c9781b883846fc9eaab6b2cfa8a654": {
+      "category": "cabinet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/cabinet.png row 1 and candidates/cabinet.png row 1. Cabinet doors/shelves vertical and base below body. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "2dd0cc6b57dd4042b5f28153022e5810": {
+      "category": "cabinet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/cabinet.png row 2 and candidates/cabinet.png row 2. Cabinet doors/shelves vertical and base below body. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "3605575081e146fbb846eb604f33a604": {
+      "category": "cabinet",
+      "status": "excluded",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        -1
+      ],
+      "evidence": "Visual review of audit-before/cabinet.png row 3 and candidates/cabinet.png row 3. Cabinet doors/shelves vertical and base below body. Rejected after corrected four-view audit: Corrected four-view audit does not establish a confident upright sign.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "90c9d43d35d24cada6be59424fb59eee": {
+      "category": "cabinet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        -1
+      ],
+      "evidence": "Visual review of audit-before/cabinet.png row 4 and candidates/cabinet.png row 4. Cabinet doors/shelves vertical and base below body. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "9c5db5a2d10c4dd59c5be947187ce367": {
+      "category": "cabinet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        -1
+      ],
+      "evidence": "Visual review of audit-before/cabinet.png row 5 and candidates/cabinet.png row 5. Cabinet doors/shelves vertical and base below body. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "9e194868da754d55afc876127dc8f74b": {
+      "category": "cabinet",
+      "status": "verified",
+      "up": [
+        -1,
+        0,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/cabinet.png row 6 and candidates/cabinet.png row 6. Cabinet doors/shelves vertical and base below body. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "a3c221e5504d40a8ba019f8f1bf5ab0e": {
+      "category": "cabinet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/cabinet.png row 7 and candidates/cabinet.png row 7. Cabinet doors/shelves vertical and base below body. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "a9ed7b1e55824b37b7e5eabdba6545ff": {
+      "category": "cabinet",
+      "status": "excluded",
+      "up": [
+        1,
+        0,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/cabinet.png row 8 and candidates/cabinet.png row 8. Cabinet doors/shelves vertical and base below body. Rejected after corrected four-view audit: Corrected side views remain tilted; requires a custom non-cardinal rotation.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "b7e25d2b684747c08e90b8cf446bdb43": {
+      "category": "cabinet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        -1
+      ],
+      "evidence": "Visual review of audit-before/cabinet.png row 9 and candidates/cabinet.png row 9. Cabinet doors/shelves vertical and base below body. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "13407a0758804fc09ec4c7e51e9f9d0e": {
+      "category": "chair",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/chair.png row 0 and candidates/chair.png row 0. Seat over legs, backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "25726a8d0d514c90bf83f30c2b985ee2": {
+      "category": "chair",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/chair.png row 1 and candidates/chair.png row 1. Seat over legs, backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "351d798f9cc3451099200c5235aee352": {
+      "category": "chair",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/chair.png row 2 and candidates/chair.png row 2. Seat over legs, backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "6d87c7d4372a440898132af4142ade4a": {
+      "category": "chair",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/chair.png row 3 and candidates/chair.png row 3. Seat over legs, backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "913530823cd94f13b7e8f6fc60e4f93b": {
+      "category": "chair",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/chair.png row 4 and candidates/chair.png row 4. Seat over legs, backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "c20ff73f6713422591842e29a698230b": {
+      "category": "chair",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/chair.png row 5 and candidates/chair.png row 5. Seat over legs, backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "db3b4773db17478786595286215e3061": {
+      "category": "chair",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/chair.png row 6 and candidates/chair.png row 6. Seat over legs, backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "e58503a145144470be27e38f014db153": {
+      "category": "chair",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/chair.png row 7 and candidates/chair.png row 7. Seat over legs, backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "ed1d1e31426e4368a9478e6fa9291e7b": {
+      "category": "chair",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/chair.png row 8 and candidates/chair.png row 8. Seat over legs, backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "f7b5e38a9a6c4fb2b445396c6bfc6368": {
+      "category": "chair",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/chair.png row 9 and candidates/chair.png row 9. Seat over legs, backrest above seat. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "1837f10d9b064fd88a607a3d391a17af": {
+      "category": "desk",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/desk.png row 0 and candidates/desk.png row 0. Desktop above supports; accessories above desktop where present. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "23df23edda25472994f6665b612e7ab4": {
+      "category": "desk",
+      "status": "excluded",
+      "up": null,
+      "front": null,
+      "evidence": "Visual review of audit-before/desk.png row 1 and candidates/desk.png row 1. Dominant flat plane; no clearly identifiable complete desk.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "370b7c88b4334dd29cda3adce3a10fa6": {
+      "category": "desk",
+      "status": "verified",
+      "up": [
+        1,
+        0,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/desk.png row 2 and candidates/desk.png row 2. Desktop above supports; accessories above desktop where present. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "7e40ee7acf9a4e6ba52c76a5bb280c4e": {
+      "category": "desk",
+      "status": "excluded",
+      "up": null,
+      "front": null,
+      "evidence": "Visual review of audit-before/desk.png row 3 and candidates/desk.png row 3. Tilted/fragmented scene; cardinal candidates do not establish upright confidently.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "7f92080d86484d81b8dd30317bb28586": {
+      "category": "desk",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/desk.png row 4 and candidates/desk.png row 4. Desktop above supports; accessories above desktop where present. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "850e244791574894a9b8c5134468e64a": {
+      "category": "desk",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/desk.png row 5 and candidates/desk.png row 5. Desktop above supports; accessories above desktop where present. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "8fda709c6b2646a49f884d130c0c86da": {
+      "category": "desk",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        -1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/desk.png row 6 and candidates/desk.png row 6. Desktop above supports; accessories above desktop where present. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "b05862a2023f4c02988b3bb3004f6ff6": {
+      "category": "desk",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/desk.png row 7 and candidates/desk.png row 7. Desktop above supports; accessories above desktop where present. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "b69ad0b5456249318982aec3e0aeeb6f": {
+      "category": "desk",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        -1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/desk.png row 8 and candidates/desk.png row 8. Desktop above supports; accessories above desktop where present. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "f817f0a83a3f49ac942d46e53f930136": {
+      "category": "desk",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/desk.png row 9 and candidates/desk.png row 9. Desktop above supports; accessories above desktop where present. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "03e706cd42504955b08379f45633c9ef": {
+      "category": "lamp",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/lamp.png row 0 and candidates/lamp.png row 0. Base below stem and light/shade. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "2759a3b8773a449c82992cc042bb4289": {
+      "category": "lamp",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/lamp.png row 1 and candidates/lamp.png row 1. Base below stem and light/shade. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "2b14055dc8054ec79b4d0d7e8f00be1e": {
+      "category": "lamp",
+      "status": "verified",
+      "up": [
+        1,
+        0,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/lamp.png row 2 and candidates/lamp.png row 2. Base below stem and light/shade. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "75d0449d82464b468a85a94a4cf713a3": {
+      "category": "lamp",
+      "status": "verified",
+      "up": [
+        1,
+        0,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/lamp.png row 3 and candidates/lamp.png row 3. Base below stem and light/shade. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "7ae0b797a22d4c8c8defacbf11a55370": {
+      "category": "lamp",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/lamp.png row 4 and candidates/lamp.png row 4. Base below stem and light/shade. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "9590563aa19f458a9f3a931fb0da09af": {
+      "category": "lamp",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/lamp.png row 5 and candidates/lamp.png row 5. Base below stem and light/shade. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "b3eaf60f6c4c4f56a39e491f1e606ff3": {
+      "category": "lamp",
+      "status": "verified",
+      "up": [
+        1,
+        0,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/lamp.png row 6 and candidates/lamp.png row 6. Base below stem and light/shade. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "c9c72a8329f34a0e922bdd4fb1aa233d": {
+      "category": "lamp",
+      "status": "excluded",
+      "up": null,
+      "front": null,
+      "evidence": "Visual review of audit-before/lamp.png row 7 and candidates/lamp.png row 7. Presentation plaque dominates asset; lamp orientation ambiguous.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "d45b51f76e704625814794b1d03b9dd5": {
+      "category": "lamp",
+      "status": "verified",
+      "up": [
+        -1,
+        0,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/lamp.png row 8 and candidates/lamp.png row 8. Base below stem and light/shade. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "e886ef51f2e844ca8df77d041151068b": {
+      "category": "lamp",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/lamp.png row 9 and candidates/lamp.png row 9. Base below stem and light/shade. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "1b6dea328d4141b3b20459b45ebe929a": {
+      "category": "sofa",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/sofa.png row 0 and candidates/sofa.png row 0. Cushions above base and backrest above cushions. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "207cea3239944c91ab111ca8ee244024": {
+      "category": "sofa",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/sofa.png row 1 and candidates/sofa.png row 1. Cushions above base and backrest above cushions. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "29758a21696444848f4a41dbd90db576": {
+      "category": "sofa",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/sofa.png row 2 and candidates/sofa.png row 2. Cushions above base and backrest above cushions. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "4ffa78d0e5504da5a1f75ff73a439abf": {
+      "category": "sofa",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/sofa.png row 3 and candidates/sofa.png row 3. Cushions above base and backrest above cushions. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "5054e4c4a391422998ba42261360620b": {
+      "category": "sofa",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/sofa.png row 4 and candidates/sofa.png row 4. Cushions above base and backrest above cushions. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "5ec9697d85654005b27fd29bd6df987e": {
+      "category": "sofa",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/sofa.png row 5 and candidates/sofa.png row 5. Cushions above base and backrest above cushions. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "9c242421a7c1447f941f72b57e7473e5": {
+      "category": "sofa",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/sofa.png row 6 and candidates/sofa.png row 6. Cushions above base and backrest above cushions. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "9cef8fd19dd84684b91830f35cc54d4f": {
+      "category": "sofa",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/sofa.png row 7 and candidates/sofa.png row 7. Cushions above base and backrest above cushions. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "c11f517d18d4494c8907c5a8f78f45a7": {
+      "category": "sofa",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/sofa.png row 8 and candidates/sofa.png row 8. Cushions above base and backrest above cushions. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "c2414bdd1a3e4604a011c7889983c0dd": {
+      "category": "sofa",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        0,
+        0,
+        1
+      ],
+      "evidence": "Visual review of audit-before/sofa.png row 9 and candidates/sofa.png row 9. Cushions above base and backrest above cushions. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "06ea30fe0e394fcab3b1793439c473ac": {
+      "category": "stool",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/stool.png row 0 and candidates/stool.png row 0. Seat above supports. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "11656915f8fc4d4c8b5e3fb50ca5cae7": {
+      "category": "stool",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/stool.png row 1 and candidates/stool.png row 1. Seat above supports. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "1b5f52a5181942ccb5415f1a4ff4ea3c": {
+      "category": "stool",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/stool.png row 2 and candidates/stool.png row 2. Seat above supports. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "1bbc23a1c0374d64b92eebbdbb119017": {
+      "category": "stool",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/stool.png row 3 and candidates/stool.png row 3. Seat above supports. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "854a98abff3841439ee890dc0e78dd66": {
+      "category": "stool",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/stool.png row 4 and candidates/stool.png row 4. Seat above supports. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "9465276706b444bbb06065ddd42c72b0": {
+      "category": "stool",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/stool.png row 5 and candidates/stool.png row 5. Seat above supports. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "a7e73eafa8774707b122031a6b60b306": {
+      "category": "stool",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/stool.png row 6 and candidates/stool.png row 6. Seat above supports. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "b4fc5f9e411c486394ac30c1843b5c6b": {
+      "category": "stool",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/stool.png row 7 and candidates/stool.png row 7. Seat above supports. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "b9dcf679efbd4e5e95d7d6f5caaf6c1b": {
+      "category": "stool",
+      "status": "excluded",
+      "up": null,
+      "front": null,
+      "evidence": "Visual review of audit-before/stool.png row 8 and candidates/stool.png row 8. Stool tilted off all cardinal axes; needs a custom rotation review.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "c4ea42b0c5b745fb83d095281df54a5d": {
+      "category": "stool",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/stool.png row 9 and candidates/stool.png row 9. Seat above supports. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "0fd1d0546f8e422b97a4fd5cfe959d2e": {
+      "category": "table",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/table.png row 0 and candidates/table.png row 0. Tabletop above supporting legs/base. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "43671c36a613433f87b54cbe4e9c1ecc": {
+      "category": "table",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/table.png row 1 and candidates/table.png row 1. Tabletop above supporting legs/base. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "595d93b528a64fdf962a46ed800c7125": {
+      "category": "table",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        -1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/table.png row 2 and candidates/table.png row 2. Tabletop above supporting legs/base. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "5a9c7c1899c84a8e87fb3930132cf478": {
+      "category": "table",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/table.png row 3 and candidates/table.png row 3. Tabletop above supporting legs/base. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "965082403694407fb14ed19eb109018e": {
+      "category": "table",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/table.png row 4 and candidates/table.png row 4. Tabletop above supporting legs/base. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "9746de160d884d4c870d761793fa4343": {
+      "category": "table",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/table.png row 5 and candidates/table.png row 5. Tabletop above supporting legs/base. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "a1197fa450a3428e88e13df8219e423e": {
+      "category": "table",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/table.png row 6 and candidates/table.png row 6. Tabletop above supporting legs/base. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "a6ca57363110496cae1826dc7f97992f": {
+      "category": "table",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/table.png row 7 and candidates/table.png row 7. Tabletop above supporting legs/base. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "cffefcce9ac24c25a738eb1c491ba8a4": {
+      "category": "table",
+      "status": "verified",
+      "up": [
+        0,
+        0,
+        1
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/table.png row 8 and candidates/table.png row 8. Tabletop above supporting legs/base. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "fabb3a16609b49789c016f9e171785be": {
+      "category": "table",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/table.png row 9 and candidates/table.png row 9. Tabletop above supporting legs/base. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "3446229dce1f47528fa871cc7669136c": {
+      "category": "toilet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/toilet.png row 0 and candidates/toilet.png row 0. Bowl above pedestal, tank/lid above bowl. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "481213ccd95f4f5ab16fe242ff8f30eb": {
+      "category": "toilet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        -1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/toilet.png row 1 and candidates/toilet.png row 1. Bowl above pedestal, tank/lid above bowl. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "660cff67e8fb4bdda64e2d3e0c0641a4": {
+      "category": "toilet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        -1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/toilet.png row 2 and candidates/toilet.png row 2. Bowl above pedestal, tank/lid above bowl. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "7df8ae89ff1f4f3c9f82d5a3e0a3f396": {
+      "category": "toilet",
+      "status": "verified",
+      "up": [
+        -1,
+        0,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/toilet.png row 3 and candidates/toilet.png row 3. Bowl above pedestal, tank/lid above bowl. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "7eb601a5502549f9876a2eec0638b68a": {
+      "category": "toilet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/toilet.png row 4 and candidates/toilet.png row 4. Bowl above pedestal, tank/lid above bowl. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "9696c81e699b483a94382d0886b464b0": {
+      "category": "toilet",
+      "status": "verified",
+      "up": [
+        -1,
+        0,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/toilet.png row 5 and candidates/toilet.png row 5. Bowl above pedestal, tank/lid above bowl. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "ab89c948efab4b9eaf12d9f0e72acab7": {
+      "category": "toilet",
+      "status": "excluded",
+      "up": null,
+      "front": null,
+      "evidence": "Visual review of audit-before/toilet.png row 6 and candidates/toilet.png row 6. Fragmented room/scene rather than a clean toilet example.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "c00eb007075144949097e9ac78d483c3": {
+      "category": "toilet",
+      "status": "verified",
+      "up": [
+        -1,
+        0,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/toilet.png row 7 and candidates/toilet.png row 7. Bowl above pedestal, tank/lid above bowl. Corrected four-view audit identified the opposite up sign; use -X. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "dfc3c0d86d1b462797f6ca2e8f67f7f5": {
+      "category": "toilet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        -1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/toilet.png row 8 and candidates/toilet.png row 8. Bowl above pedestal, tank/lid above bowl. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "f6a2a80de6db45e29c1a0491cfe685fb": {
+      "category": "toilet",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": [
+        -1,
+        0,
+        0
+      ],
+      "evidence": "Visual review of audit-before/toilet.png row 9 and candidates/toilet.png row 9. Bowl above pedestal, tank/lid above bowl. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Front identified from backrest/doors/bowl in cardinal diagnostic views."
+    },
+    "41c181cbec8c4af4ad4b32b90acebd51": {
+      "category": "vase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/vase.png row 0 and candidates/vase.png row 0. Opening/neck above body and foot. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "61e84e04346241419ee6e33636fca3ae": {
+      "category": "vase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/vase.png row 1 and candidates/vase.png row 1. Opening/neck above body and foot. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "6d7e6e9e42ce46ef8e2361bc419d211d": {
+      "category": "vase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/vase.png row 2 and candidates/vase.png row 2. Opening/neck above body and foot. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "70ddf004ecb7474883d26cffdc443250": {
+      "category": "vase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/vase.png row 3 and candidates/vase.png row 3. Opening/neck above body and foot. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "712e1b9155e84173806bdae1868aa7a0": {
+      "category": "vase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/vase.png row 4 and candidates/vase.png row 4. Opening/neck above body and foot. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "9f1335d8cc9c4d14a5612abce5c836b3": {
+      "category": "vase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/vase.png row 5 and candidates/vase.png row 5. Opening/neck above body and foot. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "abf88446568f4303bcb0b2480bd6d87c": {
+      "category": "vase",
+      "status": "excluded",
+      "up": null,
+      "front": null,
+      "evidence": "Visual review of audit-before/vase.png row 6 and candidates/vase.png row 6. Asset resembles a chair rather than a vase; category mismatch.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "b217bb1abb8e40beae7d3d29b9e283c7": {
+      "category": "vase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/vase.png row 7 and candidates/vase.png row 7. Opening/neck above body and foot. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "bb0d4e90dfde4cd58076859edf0a129d": {
+      "category": "vase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/vase.png row 8 and candidates/vase.png row 8. Opening/neck above body and foot. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    },
+    "d726514a97f74f168b104fd6ba538331": {
+      "category": "vase",
+      "status": "verified",
+      "up": [
+        0,
+        1,
+        0
+      ],
+      "front": null,
+      "evidence": "Visual review of audit-before/vase.png row 9 and candidates/vase.png row 9. Opening/neck above body and foot. Checked corrected cardinal views at elevation 15 degrees.",
+      "reviewer": "Codex visual review; reproducible diagnostic renders",
+      "front_note": "Semantic front unverified or not unique; azimuth remains geometric."
+    }
+  }
+}

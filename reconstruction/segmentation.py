@@ -43,30 +43,82 @@ class SAM3Preprocessor:
         ranked = eligible[np.argsort(-scores[eligible], kind="stable")]
         return ranked[:max_masks].tolist()
 
+    @staticmethod
+    def _numpy_prediction(prediction, image_size, include_spatial=True):
+        """Move one SAM3 prediction to CPU without losing raw candidates."""
+        width, height = image_size
+        scores = prediction["scores"].detach().float().cpu().numpy().reshape(-1)
+        if not include_spatial:
+            return {"scores": scores}
+        masks = prediction["masks"].detach().cpu().numpy()
+        if masks.ndim == 4 and masks.shape[1] == 1:
+            masks = masks[:, 0]
+        masks = masks.astype(bool)
+        if masks.size:
+            masks = masks.reshape(-1, height, width)
+        else:
+            masks = np.empty((0, height, width), dtype=bool)
+        boxes = prediction["boxes"].detach().float().cpu().numpy()
+        boxes = boxes.reshape(-1, 4) if boxes.size else np.empty((0, 4), dtype=boxes.dtype)
+        return {"scores": scores, "boxes": boxes, "masks": masks}
+
+    def detect_many(self, image, queries, *, spatial_queries=None):
+        """Run several text queries while encoding ``image`` only once.
+
+        The returned mapping preserves the input query order.  This matters for
+        closed-vocabulary experiments, where every class must be scored against
+        the exact same image embedding. By default every result includes masks
+        and boxes. ``spatial_queries`` can restrict those large arrays to prompts
+        whose localization output is actually needed.
+        """
+        queries = list(queries)
+        if not queries or any(not isinstance(q, str) or not q.strip() for q in queries):
+            raise ValueError("queries must be a nonempty sequence of nonempty strings")
+        if len(set(queries)) != len(queries):
+            raise ValueError("queries must not contain duplicates")
+        spatial_queries = set(queries if spatial_queries is None else spatial_queries)
+        if not spatial_queries.issubset(queries):
+            raise ValueError("spatial_queries must be a subset of queries")
+        import torch
+
+        detections = {}
+        with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+            state = self.processor.set_image(image)
+            for query in queries:
+                prediction = self.processor.set_text_prompt(state=state, prompt=query)
+                detections[query] = self._numpy_prediction(
+                    prediction, (image.width, image.height),
+                    include_spatial=query in spatial_queries)
+            self.processor.reset_all_prompts(state)
+        return detections
+
+    def detect(self, image, query):
+        """Return every SAM3 candidate for `query`, before any confidence filter.
+
+        `image` is a normalized RGB PIL image. The result preserves SAM3's raw
+        output so callers can apply their own thresholds or scoring::
+
+            {"scores": np.ndarray (N,) float32,
+             "boxes":  np.ndarray (N, 4) float32, xyxy pixels,
+             "masks":  np.ndarray (N, H, W) bool at the source resolution}
+
+        This is the shared model call: `masks_for_query` filters and writes on
+        top of it, and experiments consume the unfiltered candidates directly.
+        """
+        if not query or not query.strip():
+            raise ValueError("query must not be empty")
+        return self.detect_many(image, [query])[query]
+
     def masks_for_query(self, image, query, output_dir):
         """Save and return the top threshold-passing SAM3 instances matching `query`.
 
         `image` is a normalized RGB PIL image.
         Output masks are binary PNGs at the source image resolution.
         """
-        if not query or not query.strip():
-            raise ValueError("query must not be empty")
-        import torch
-
-        with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
-            state = self.processor.set_image(image)
-            prediction = self.processor.set_text_prompt(state=state, prompt=query)
-        masks = prediction["masks"].detach().cpu().numpy()
-        if masks.ndim == 4 and masks.shape[1] == 1:
-            masks = masks[:, 0]
-        masks = masks.astype(bool)
-        if masks.size:
-            masks = masks.reshape(-1, image.height, image.width)
-        else:
-            masks = np.empty((0, image.height, image.width), dtype=bool)
-        scores = prediction["scores"].detach().float().cpu().numpy().reshape(-1)
-        boxes = prediction["boxes"].detach().float().cpu().numpy()
-        boxes = boxes.reshape(-1, 4) if boxes.size else np.empty((0, 4), dtype=boxes.dtype)
+        detection = self.detect(image, query)
+        masks = detection["masks"]
+        scores = detection["scores"]
+        boxes = detection["boxes"]
         selected_indices = self.highest_confidence_indices(
             scores, len(masks), self.threshold, self.max_masks)
         if selected_indices and len(boxes) != len(masks):

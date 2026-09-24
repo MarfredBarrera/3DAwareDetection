@@ -34,6 +34,17 @@ sam3d-env sam3d python -m harness.build_dataset \
   --occlusion-levels 0 0.15 0.3 0.45 0.6 --save-depth
 ```
 
+Use `--objects-per-category N` instead of `--limit` for a balanced experiment.
+It requires at least `N` eligible objects in every requested category and fails
+with the per-category availability counts otherwise.
+
+For upright datasets, use the review workflow in
+[`experiments/viewpoint_sensitivity/README.md`](../experiments/viewpoint_sensitivity/README.md).
+It produces a separate canonical file with per-object up/front corrections.
+`--require-upright-verified` refuses unreviewed target meshes and records the
+orientation evidence in each rendered sample's index entry. The camera keeps
+world +Y vertical; this alone cannot correct a sideways source mesh.
+
 Use `--help` for mesh filters, camera distance, occluder placement, and search
 tolerance. A lateral sweep followed by bisection finds requested occlusion
 levels. Unreachable levels are counted and skipped. An unoccluded image is
