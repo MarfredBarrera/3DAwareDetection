@@ -73,6 +73,8 @@ off-center translations, and writes RGB/masks/depth with searchable metadata.
 
 - `main.py`: configuration, sequential worker launch, and stage orchestration.
 - `reconstruction/`: SAM3 segmentation, SAM3D inference, rendering/viewer.
+- `viewpoint_optimization/`: a one-image FastSAM3D azimuth/elevation plot with an aligned
+  ambiguity heatmap. See its [README](viewpoint_optimization/README.md).
 - `harness/`: Objaverse canonicalization and controlled viewpoint/occlusion data.
   See [harness/README.md](harness/README.md).
 - `experiments/viewpoint_sensitivity/`: balanced multi-view SAM3 recognition and

@@ -1,4 +1,4 @@
-image: outputs/viewpoint-sensitivity-upright/sam3d_inputs/bench/9aecdbb725e84a1ab77642aa7767b383/low_accuracy/viewpoint_(azimuth_270_elevation_0)/rgb.png
+image: outputs/viewpoint-sensitivity-upright/render/samples/9aecdbb725e84a1ab77642aa7767b383/a270.0_e0.0_o0.0.rgb.png
 query: desk
 output_dir: outputs/sam3d_correction
 # Docker exposes all GPUs; each worker uses this host GPU index as cuda:0.

@@ -1,0 +1,24 @@
+# Paths are relative to this YAML file unless absolute.
+image: ../outputs/sam3d_correction/input.png
+# Use exactly one of query or mask. A mask skips SAM3 segmentation.
+mask: ../outputs/sam3d_correction/masks/mask-000.png
+# query: desk
+output_dir: ../outputs/fastsam3d-upright-grid
+gpu_id: 5
+
+preprocessing:
+  checkpoint: /data/checkpoints/sam3/sam3.pt
+  threshold: 0.3
+
+reconstruction:
+  checkpoint_dir: /data/checkpoints/sam3d/hf
+  resolution: 128
+  seed: 42
+  # Match experiments/viewpoint_sensitivity/config.upright.yaml.
+  azimuths: [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
+  elevations: [0, 15, 30, 45, 60]
+
+scoring:
+  metric: visual_entropy
+  options:
+    bins: 32

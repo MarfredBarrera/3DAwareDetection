@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
-from .visualization import render_turntable
+from .visualization import render_turntable, render_view_grid
 
 
 def _synchronize_cuda():
@@ -52,12 +52,13 @@ class SAM3D:
         self._render_video = render_video
         self.last_timing = None
 
-    def render_views(self, rgb, mask, output_dir, views=8, resolution=512, seed=42, pointmap=None):
-        """Return uint8 RGB frames and write a PLY, view PNGs, and a turntable GIF.
+    def render_views(self, rgb, mask, output_dir, views=8, resolution=512, seed=42, pointmap=None,
+                     view_grid=None):
+        """Write a PLY and either turntable frames or an azimuth/elevation view grid.
 
         ``last_timing["model_seconds"]`` covers only SAM3D inference and
-        Gaussian-scene preparation. It deliberately excludes input loading,
-        PLY output, turntable rendering, PNG writes, and GIF encoding.
+        Gaussian-scene preparation. It excludes input loading, PLY output,
+        view rendering, PNG writes, and GIF encoding.
         """
         from time import perf_counter
 
@@ -83,20 +84,27 @@ class SAM3D:
         _synchronize_cuda()
         model_started = perf_counter()
         output = self._inference(np.asarray(image), mask, seed=seed, pointmap=pointmap)
-        gaussian = self._prepare_gaussian(self._make_scene(output))
+        scene = self._make_scene(output)
+        gaussian = self._prepare_gaussian(scene)
         _synchronize_cuda()
         model_seconds = perf_counter() - model_started
 
         ply_started = perf_counter()
         gaussian.save_ply(str(output_dir / "object.ply"))
+        if view_grid is not None and "mesh" in output:
+            _save_render_mesh(output, scene, output_dir)
         ply_write_seconds = perf_counter() - ply_started
 
-        turntable_started = perf_counter()
-        frames = render_turntable(gaussian, self._render_video, output_dir, views, resolution)
+        render_started = perf_counter()
+        frames = (render_view_grid(gaussian, self._render_video, output_dir / "views",
+                                   *view_grid, resolution=resolution)
+                  if view_grid is not None else
+                  render_turntable(gaussian, self._render_video, output_dir, views, resolution))
         self.last_timing = {
             "model_seconds": model_seconds,
             "ply_write_seconds": ply_write_seconds,
-            "turntable_seconds": perf_counter() - turntable_started,
+            ("view_grid_seconds" if view_grid is not None else "turntable_seconds"):
+                perf_counter() - render_started,
         }
         return frames
 
@@ -111,3 +119,27 @@ def _pointmap(pointmap, image_size):
     if not np.isfinite(pointmap).all():
         raise ValueError("pointmap must contain only finite coordinates")
     return pointmap
+
+
+def _save_render_mesh(output, scene_gaussian, output_dir):
+    """Export FastSAM3D's decoded mesh in the normalized Gaussian render frame."""
+    import trimesh
+    from sam3d_objects.utils.visualization import SceneVisualizer
+
+    mesh = output["mesh"][0]
+    vertices = mesh.vertices
+    positions = scene_gaussian.get_xyz
+    active = (scene_gaussian.get_opacity > 0.9).squeeze()
+    active_positions = positions[active]
+    scale = (active_positions.max(dim=0).values - active_positions.min(dim=0).values).max()
+    center = (active_positions.max(dim=0).values + active_positions.min(dim=0).values) / 2
+    world = SceneVisualizer.object_pointcloud(
+        points_local=vertices.unsqueeze(0), quat_l2c=output["rotation"],
+        trans_l2c=output["translation"], scale_l2c=output["scale"],
+    ).points_list()[0]
+    normalized = ((world - center) / scale).detach().cpu().numpy().astype(np.float32)
+    faces = mesh.faces.detach().cpu().numpy().astype(np.int32)
+    if not np.isfinite(normalized).all() or len(faces) == 0:
+        raise RuntimeError("FastSAM3D returned an invalid mesh")
+    np.savez_compressed(output_dir / "mesh.npz", vertices=normalized, faces=faces)
+    trimesh.Trimesh(vertices=normalized, faces=faces, process=False).export(output_dir / "mesh.ply")
