@@ -67,6 +67,8 @@ def main() -> None:
     p.add_argument("--limit", type=int, default=20, help="objects to render")
     p.add_argument("--objects-per-category", type=int, default=None,
                    help="balanced category sample; overrides the global --limit")
+    p.add_argument("--uids", nargs="*", default=None,
+                   help="render exactly these objects; overrides --limit and filters")
     p.add_argument("--azimuths", type=float, nargs="*",
                    default=[0, 45, 90, 135, 180, 225, 270, 315])
     p.add_argument("--elevations", type=float, nargs="*", default=[0, 20, 40])
@@ -117,9 +119,15 @@ def main() -> None:
     if not pool:
         raise SystemExit("no objects matched the filters")
     rng.shuffle(pool)
-    chosen = select_uids(pool, store.objects, limit=args.limit,
-                         objects_per_category=args.objects_per_category,
-                         categories=args.categories)
+    if args.uids:
+        unknown = sorted(set(args.uids) - set(store.objects))
+        if unknown:
+            raise SystemExit(f"unknown uids: {unknown[:4]}")
+        chosen = sorted(args.uids)
+    else:
+        chosen = select_uids(pool, store.objects, limit=args.limit,
+                             objects_per_category=args.objects_per_category,
+                             categories=args.categories)
     if args.require_upright_verified:
         unverified = [uid for uid in chosen
                       if store.objects[uid].get("upright_verification", {}).get("status")

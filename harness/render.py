@@ -16,6 +16,8 @@ from pytorch3d.renderer import (
 )
 from pytorch3d.structures import Meshes, join_meshes_as_scene
 
+from tools.cameras import HARNESS_LOOK_AT
+
 WORLD_UP = torch.tensor([0.0, 1.0, 0.0])
 
 
@@ -77,7 +79,7 @@ class Harness:
             n = 1.0
         return (right / n)[[0, 2]]
 
-    LOOK_AT = (0.0, 0.35, 0.0)
+    LOOK_AT = HARNESS_LOOK_AT
 
     def occluder_placement(self, cameras, occluder, offset, along=0.5,
                            height_factor=1.6, scale_mult=1.0):

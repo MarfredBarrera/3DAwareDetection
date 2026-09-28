@@ -1,0 +1,48 @@
+# Viewpoint study on the reviewed upright Objaverse cohort (110 objects).
+# Before: SAM3 on every ground-truth view. After: SAM3 on the SAM3D candidate
+# chosen per input view. Paths are relative to this file.
+# Check nvidia-smi and set gpu_id to an idle GPU before running.
+output_dir: ../outputs/upright
+gpu_id: 1
+
+dataset:
+  root: /data/objaverse_nas
+  # Built by `python -m harness.upright apply` from the reviewed decisions.
+  canonical: ../outputs/upright/canonical.json
+  require_upright_verified: true
+  categories: [chair, sofa, table, bed, lamp, bookcase, desk, stool, cabinet, vase, toilet, bench]
+  objects_per_category: 10
+  azimuths: [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
+  elevations: [0, 15, 30, 45, 60]
+  distance: 2.2
+  image_size: 320
+
+detection:
+  # Applied at analysis time; raw scores are stored, so changing these is free.
+  score_threshold: 0.5
+  iou_threshold: 0.5
+
+reconstruction:
+  # Inputs: every visible view of the first N objects per category (optionally
+  # only some elevations). Growing these later only adds work.
+  objects_per_category: 10
+  input_elevations: null
+  # Candidate grid relative to the input camera: (180, 0) re-renders the input
+  # view and must be included (identity control). The distance frames the
+  # object (largest extent 1) at roughly the ground-truth size; below ~1.6 it is clipped.
+  candidate_azimuths: [0, 45, 90, 135, 180, 225, 270, 315]
+  candidate_elevations: [0, 30, 60]
+  candidate_distance: 2.0
+  resolution: 320
+  seed: 42
+
+ambiguity:
+  visual_entropy: {bins: 32}
+  self_occlusion: {samples: 20000, seed: 0}
+  surface_normal_entropy: {samples: 20000, seed: 0, polar_bins: 9, azimuth_bins: 18}
+
+analysis:
+  primary_selector: ambiguity:combined
+  # Weights of each metric's within-input rank in ambiguity:combined (missing
+  # metrics get 0; null = equal). Analysis-only: rerun with --stages analyze.
+  combined_weights: {visual_entropy: 0.2, self_occlusion: 0.4, surface_normal_entropy: 0.4}

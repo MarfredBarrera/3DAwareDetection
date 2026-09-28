@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from experiments.viewpoint_sensitivity.upright import corrected_record, frame_rotation, UP_DIRECTIONS
+from harness.upright import corrected_record, frame_rotation, UP_DIRECTIONS
 
 
 class UprightFrameTests(unittest.TestCase):

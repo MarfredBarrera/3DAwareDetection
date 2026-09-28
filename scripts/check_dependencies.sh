@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Check the image, CUDA device, and all libraries used by main.py.
+# Check the image, CUDA device, and both model environments used by the study.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

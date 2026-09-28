@@ -35,6 +35,12 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(config["output_dir"], str(self.root / "output"))
         self.assertEqual(config["gpu_id"], 0)
 
+    def test_supplied_frame_and_query_override_demo_placeholder(self):
+        config = main.load_config(main.WORKSPACE / "configs/demo.yaml",
+                                  image=self.image, query="vase")
+        self.assertEqual(config["image"], str(self.image))
+        self.assertEqual(config["query"], "vase")
+
     def test_gpu_id_must_be_non_negative_integer(self):
         self.config["gpu_id"] = -1
         with self.assertRaisesRegex(ValueError, "gpu_id"):
@@ -135,7 +141,7 @@ class PipelineTests(unittest.TestCase):
         (output / "stale-mask.png").touch()
         model = Mock()
         with patch("reconstruction.sam3d.SAM3D", return_value=model), \
-                patch("reconstruction.visualization.launch_viewer") as viewer:
+                patch("reconstruction.sam3d.launch_viewer") as viewer:
             main.reconstruct(settings)
         self.assertEqual(model.render_views.call_count, 2)
         self.assertEqual([call.args[1] for call in model.render_views.call_args_list],

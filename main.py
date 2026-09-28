@@ -9,13 +9,17 @@ import subprocess
 WORKSPACE = Path(__file__).resolve().parent
 
 
-def load_config(path):
+def load_config(path, *, image=None, query=None):
     import yaml
 
     path = Path(path).resolve()
     config = yaml.safe_load(path.read_text())
     if not isinstance(config, dict):
         raise ValueError("Config must be a YAML mapping")
+    if image is not None:
+        config["image"] = str(Path(image).expanduser().resolve())
+    if query is not None:
+        config["query"] = query
     allowed = {"image", "query", "output_dir", "gpu_id", "preprocessing", "reconstruction", "visualization"}
     if config.keys() - allowed:
         raise ValueError(f"Unknown config settings: {sorted(config.keys() - allowed)}")
@@ -155,13 +159,13 @@ def reconstruct(settings):
         )
     print(f"Saved reconstructions and visualizations to {output}", flush=True)
     if config["visualization"]["enabled"]:
-        from reconstruction.visualization import launch_viewer
+        from reconstruction.sam3d import launch_viewer
         launch_viewer(objects, host=config["visualization"]["host"],
                       port=config["visualization"]["port"])
 
 
-def run_pipeline(config_path, *, no_viewer=False, output_dir=None):
-    config = load_config(config_path)
+def run_pipeline(config_path, *, image=None, query=None, no_viewer=False, output_dir=None):
+    config = load_config(config_path, image=image, query=query)
     if no_viewer:
         config["visualization"]["enabled"] = False
     if output_dir is not None:
@@ -183,7 +187,9 @@ def run_pipeline(config_path, *, no_viewer=False, output_dir=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=WORKSPACE / "config.yaml")
+    parser.add_argument("--config", type=Path, default=WORKSPACE / "configs" / "demo.yaml")
+    parser.add_argument("--image", type=Path, help="Input frame; overrides the config")
+    parser.add_argument("--query", help="SAM3 text prompt; overrides the config")
     parser.add_argument("--no-viewer", action="store_true", help="Save outputs and exit")
     parser.add_argument("--output-dir", type=Path, help="Override the output directory")
     parser.add_argument("--worker", choices=("prepare", "reconstruct"), help=argparse.SUPPRESS)
@@ -191,7 +197,8 @@ def main():
     if args.worker:
         {"prepare": prepare, "reconstruct": reconstruct}[args.worker](args.config)
     else:
-        run_pipeline(args.config, no_viewer=args.no_viewer, output_dir=args.output_dir)
+        run_pipeline(args.config, image=args.image, query=args.query,
+                     no_viewer=args.no_viewer, output_dir=args.output_dir)
 
 
 if __name__ == "__main__":

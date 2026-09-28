@@ -173,24 +173,21 @@ def summarize_reviews(canonical, out):
     write_review_report(decisions, payload["objects"], out)
 
 
-def verify_cameras(index, out, settings=None):
-    """Check actual extrinsics: spherical position, proper rotation, no roll."""
-    from harness.render import Harness
+def verify_cameras(index, out, expected=None):
+    """Check actual extrinsics: spherical position, proper rotation, no roll.
+
+    ``expected`` optionally lists every (uid, azimuth, elevation) the index must contain.
+    """
+    from tools.cameras import HARNESS_LOOK_AT, direction
     rows = read_index(index)
     errors = []
     centers = []
     keys = [(r["uid"], r["azimuth"], r["elevation"]) for r in rows]
     if len(keys) != len(set(keys)):
         errors.append("duplicate object/viewpoint records")
-    if settings:
-        config = json.loads(Path(settings).read_text())
-        objects = json.loads(Path(config["canonical"]).read_text())["objects"]
-        expected = {(uid, az, el) for uid, rec in objects.items()
-                    if rec["category"] in config["categories"]
-                    for az in config["azimuths"] for el in config["elevations"]}
-        if set(keys) != expected:
-            errors.append(f"cohort/grid mismatch: missing={len(expected - set(keys))}, "
-                          f"extra={len(set(keys) - expected)}")
+    if expected is not None and set(keys) != set(expected):
+        errors.append(f"cohort/grid mismatch: missing={len(set(expected) - set(keys))}, "
+                      f"extra={len(set(keys) - set(expected))}")
     for row in rows:
         for relative in row["files"].values():
             path = Path(index).parent / relative
@@ -199,11 +196,10 @@ def verify_cameras(index, out, settings=None):
         rotation, translation = np.asarray(row["R"]), np.asarray(row["T"])
         # PyTorch3D uses row vectors: view = world @ R + T.
         center = -rotation @ translation
-        az, el = np.deg2rad([row["azimuth"], row["elevation"]])
-        expected = np.asarray(Harness.LOOK_AT) + row["distance"] * np.array(
-            [np.cos(el) * np.sin(az), np.sin(el), np.cos(el) * np.cos(az)])
-        if not np.allclose(center, expected, atol=2e-5):
-            errors.append(f"camera position: {row['uid']} {az} {el}")
+        position = np.asarray(HARNESS_LOOK_AT) + row["distance"] * direction(
+            row["azimuth"], row["elevation"])
+        if not np.allclose(center, position, atol=2e-5):
+            errors.append(f"camera position: {row['uid']} {row['azimuth']} {row['elevation']}")
         if not np.allclose(rotation.T @ rotation, np.eye(3), atol=2e-5) or np.linalg.det(rotation) < 0:
             errors.append(f"invalid camera rotation: {row['uid']}")
         projected_up = np.array([0, 1, 0]) @ rotation
@@ -244,7 +240,6 @@ def main():
     verify = sub.add_parser("verify-cameras")
     verify.add_argument("--index", required=True)
     verify.add_argument("--out", required=True)
-    verify.add_argument("--settings")
     summary = sub.add_parser("summary")
     summary.add_argument("--canonical", required=True)
     summary.add_argument("--out", required=True)

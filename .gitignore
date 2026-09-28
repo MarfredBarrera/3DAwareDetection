@@ -5,3 +5,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 build-logs/
+# Written into the cwd by Fast-SAM3D (fft/fft3d.py) on every reconstruction.
+visualization/
