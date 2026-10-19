@@ -1,6 +1,8 @@
 """Small CPU geometry checks; run in the sam3d environment."""
 import unittest
 import importlib.util
+import tempfile
+from pathlib import Path
 
 import numpy as np
 
@@ -44,6 +46,46 @@ class HarnessTests(unittest.TestCase):
         mesh.visual.vertex_colors = [255, 0, 0, 255]
         colors = ObjaverseStore._vertex_colors(mesh, len(mesh.vertices))
         np.testing.assert_allclose(colors, np.tile([1, 0, 0], (len(mesh.vertices), 1)))
+
+    def test_multimaterial_glb_keeps_each_parts_color(self):
+        import trimesh
+        from harness.meshio import load_mesh
+
+        red = trimesh.creation.box()
+        red.visual = trimesh.visual.TextureVisuals(
+            material=trimesh.visual.material.PBRMaterial(baseColorFactor=[255, 0, 0, 255]))
+        blue = trimesh.creation.box()
+        blue.visual = trimesh.visual.TextureVisuals(
+            material=trimesh.visual.material.PBRMaterial(baseColorFactor=[0, 0, 255, 255]))
+        blue.apply_translation([2, 0, 0])
+        scene = trimesh.Scene()
+        scene.add_geometry(red)
+        scene.add_geometry(blue)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "parts.glb"
+            path.write_bytes(scene.export(file_type="glb"))
+            mesh = load_mesh(str(path), with_colors=True)
+        colors = np.asarray(mesh.visual.vertex_colors)[:, :3]
+        self.assertEqual(len(colors), len(mesh.vertices))
+        for is_red, color in ((True, [255, 0, 0]), (False, [0, 0, 255])):
+            selected = colors[(mesh.vertices[:, 0] < 1) == is_red]
+            np.testing.assert_allclose(selected, np.tile(color, (len(selected), 1)))
+
+    def test_line_primitives_do_not_discard_mesh_surfaces(self):
+        import trimesh
+        from harness.meshio import load_mesh
+
+        box = trimesh.creation.box()
+        scene = trimesh.Scene()
+        scene.add_geometry(box)
+        scene.add_geometry(trimesh.load_path([[0, 0, 0], [1, 0, 0]]))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "mixed.glb"
+            path.write_bytes(scene.export(file_type="glb"))
+            mesh = load_mesh(str(path), with_colors=True)
+        self.assertEqual(len(mesh.vertices), len(box.vertices))
+        self.assertEqual(len(mesh.faces), len(box.faces))
+        self.assertEqual(len(mesh.visual.vertex_colors), len(box.vertices))
 
     def test_render_masks_and_depth_match_camera(self):
         import torch

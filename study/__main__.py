@@ -11,6 +11,7 @@ resumes after an interruption. Stage logs are appended to <output_dir>/logs/.
 import argparse
 import fcntl
 import json
+import os
 from pathlib import Path
 
 from tools.envs import run_in_env
@@ -26,8 +27,26 @@ def cohort(config):
     """Deterministic object sample: the first N eligible uids per category."""
     dataset = config["dataset"]
     objects = json.loads(Path(dataset["canonical"]).read_text())["objects"]
+    manifest = (json.loads(Path(dataset["manifest"]).read_text())
+                if dataset["manifest"] is not None else None)
+    if manifest is not None:
+        if not isinstance(manifest, dict):
+            raise ValueError("dataset.manifest must map UIDs to category and split")
+        selected = {uid: row for uid, row in manifest.items()
+                    if row.get("split") == dataset["split"]}
+        if not selected:
+            raise ValueError(f"No objects in split {dataset['split']!r}")
+        missing = set(selected) - set(objects)
+        if missing:
+            raise ValueError(f"Split objects missing from canonical index: {sorted(missing)[:4]}")
+        mismatched = [uid for uid, row in selected.items()
+                      if row["category"] != objects[uid]["category"]]
+        if mismatched:
+            raise ValueError(f"Split category differs from canonical index: {mismatched[:4]}")
+    else:
+        selected = objects
     chosen = {}
-    for uid in sorted(objects):
+    for uid in sorted(selected):
         record = objects[uid]
         category = record["category"]
         if category not in dataset["categories"] or record["face_count"] > MAX_FACES:
@@ -44,10 +63,66 @@ def cohort(config):
     return chosen
 
 
+def register_external(db, output, rows):
+    """Register completed external renders by reference, without copying images."""
+    count = 0
+    with db:
+        for index, row in rows:
+            shard = index.parent
+            rgb = shard / row["files"]["rgb"]
+            mask = shard / row["files"]["modal"]
+            if not rgb.is_file() or not mask.is_file():
+                continue
+            store.add_image(
+                db, key=gt_key(row["uid"], row["azimuth"], row["elevation"]),
+                source="gt", uid=row["uid"], category=row["category"],
+                azimuth=row["azimuth"], elevation=row["elevation"],
+                path=os.path.relpath(rgb, output),
+                mask_path=os.path.relpath(mask, output),
+                visible_px=row["modal_area"],
+                meta={key: row[key] for key in
+                      ("distance", "fov", "image_size", "intrinsics", "R", "T",
+                       "modal_bbox", "truncated") if key in row})
+            count += 1
+    return count
+
+
+def import_renders(config, groups):
+    """Import available views from a running ViewActive render job incrementally."""
+    output = Path(config["output_dir"])
+    source_run = Path(config["dataset"]["source_run"])
+    expected_uids = {uid for members in groups.values() for uid in members}
+    azimuths = set(config["dataset"]["azimuths"])
+    elevations = set(config["dataset"]["elevations"])
+    chosen = {}
+    for index in sorted((source_run / "renders").glob("shard-*/index.jsonl")):
+        with index.open() as stream:
+            for line in stream:
+                row = json.loads(line)
+                uid = row["uid"]
+                if uid in expected_uids and row["azimuth"] in azimuths and row["elevation"] in elevations:
+                    key = (uid, row["azimuth"], row["elevation"])
+                    if key in chosen:
+                        raise ValueError(f"Duplicate external render {key}")
+                    if row["category"] not in groups or uid not in groups[row["category"]]:
+                        raise ValueError(f"External render category differs from split: {uid}")
+                    chosen[key] = (index, row)
+    with store.connect(output) as db:
+        count = register_external(db, output, chosen.values())
+    expected = len(expected_uids) * len(azimuths) * len(elevations)
+    print(f"[render] imported {count}/{expected} Blender views from {source_run}; "
+          f"{len({uid for uid, _, _ in chosen})}/{len(expected_uids)} objects have started",
+          flush=True)
+    return count
+
+
 def render(config, log):
     output = Path(config["output_dir"])
     dataset = config["dataset"]
     groups = cohort(config)
+    if dataset["source_run"] is not None:
+        import_renders(config, groups)
+        return
     uids = sorted(uid for members in groups.values() for uid in members)
     index = output / RENDER_DIR / "index.jsonl"
     if not index.is_file():
@@ -120,8 +195,8 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--stages", nargs="+", choices=STAGES, default=list(STAGES))
-    parser.add_argument("--limit", type=int, help="reconstruct at most this many new inputs")
-    parser.add_argument("--workers", type=int, default=4, help="score-stage processes")
+    parser.add_argument("--limit", type=int, help="limit new reconstructions or detections in those reconstructions")
+    parser.add_argument("--workers", type=int, default=4, help="processes for the score stage and analyze figures")
     parser.add_argument("--no-object-figures", action="store_true")
     args = parser.parse_args()
     config = settings_io.load(args.config)
@@ -147,12 +222,12 @@ def main():
                 render(config, log)
                 continue
             extra = []
-            if stage == "reconstruct" and args.limit is not None:
+            if stage in ("reconstruct", "detect") and args.limit is not None:
                 extra = ["--limit", args.limit]
             elif stage == "score":
                 extra = ["--workers", args.workers]
-            elif stage == "analyze" and args.no_object_figures:
-                extra = ["--no-object-figures"]
+            elif stage == "analyze":
+                extra = ["--workers", args.workers] + (["--no-object-figures"] if args.no_object_figures else [])
             module = "study.analyze" if stage == "analyze" else "study.workers"
             worker_args = (["--stage", stage] if stage != "analyze" else [])
             run_in_env(WORKERS[stage], module, [*worker_args, "--settings", settings, *extra],

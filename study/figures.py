@@ -10,6 +10,8 @@ scores, and before/after comparisons::
 import argparse
 from dataclasses import dataclass, field
 import math
+import multiprocessing
+import shutil
 from pathlib import Path
 
 import matplotlib
@@ -212,11 +214,11 @@ def save_bars(groups, path, *, title, ylabel, errors=None):
     return Path(path)
 
 
-def save_margin_comparison(table, path, *, title, primary):
+def save_margin_comparison(table, path, *, title, primary, baseline=None):
     """Mean SAM3 margin and its paired mean change from the original input."""
     names = list(table)
     margins = np.array([table[name]["margin"] for name in names])
-    baseline = table["input"]["margin"]
+    baseline = table["input"]["margin"] if baseline is None else baseline
     interval = np.array([table[name]["margin_ci95"] for name in names])
     errors = np.vstack((margins - interval[:, 0], interval[:, 1] - margins))
     colors = ["#555555" if name == "input" else "#dd8452" if name == primary else "#4c72b0"
@@ -291,12 +293,13 @@ def _wrong_category_bars(members, scores, true_category):
                              "wrong categories above true score (winning views only)")
 
 
-def study_figures(db, config, gt, selections, summary, object_figures=True):
+def study_figures(db, config, gt, selections, summary, object_figures=True, workers=1):
     output = Path(config["output_dir"])
     figures = output / "figures"
     dataset = config["dataset"]
     azimuths, elevations = dataset["azimuths"], dataset["elevations"]
     primary = config["analysis"]["primary_selector"]
+    allowed = config["analysis"].get("figure_selectors")
     rows = store.images(db, "source='gt'")
     paths = []
 
@@ -321,13 +324,16 @@ def study_figures(db, config, gt, selections, summary, object_figures=True):
         reconstructed = [by_input[i] for i in selections]
         panels = []
         for name in ("input", "identity", primary):
+            if allowed is not None and name not in allowed:
+                continue
             values = {i: s[name]["any_fp"] for i, s in selections.items() if name in s}
             panels.append(Heatmap(_mean_map(reconstructed, values), f"any false positive: {name}",
                                   0, 1, "magma", annotate=True))
         paths.append(save_panels(panels, azimuths, elevations, figures / "after" / "false_positives.png",
                                  title="False-positive rate by input view", note=NOTE))
         for subset, data in summary["subsets"].items():
-            table = data["selectors"]
+            table = {name: row for name, row in data["selectors"].items()
+                     if allowed is None or name in allowed}
             slug = subset.split(" (")[0].replace(" ", "_")
             paths.append(save_bars(
                 {name: {"top-1 accuracy": row["correct"], "any false positive": row["any_fp"]}
@@ -338,16 +344,41 @@ def study_figures(db, config, gt, selections, summary, object_figures=True):
             paths.append(save_margin_comparison(
                 table, figures / "after" / f"margins_{slug}.png",
                 title=f"Confidence margin ({subset}, n={next(iter(table.values()))['n']})",
-                primary=primary))
+                primary=primary, baseline=data["selectors"]["input"]["margin"]))
 
     if object_figures:
+        if allowed is not None:
+            omitted = set(SELECTOR_FIGURES) - set(allowed)
+            for category in dataset["categories"]:
+                for selector in omitted:
+                    old = figures / "objects" / category / selector
+                    if old.is_dir():
+                        shutil.rmtree(old)
         margins = {i: o["margin"] for i, o in gt.items()}
         finite = [abs(v) for v in margins.values()]
         limit = max(finite, default=1.0)
-        for (category, uid), members in _objects(rows).items():
-            paths += object_figure(db, config, category, uid, members, margins, selections, limit,
-                                   figures / "objects" / category)
+        tasks = [(config, category, uid, members, {r["image_id"]: margins.get(r["image_id"]) for r in members},
+                  {r["image_id"]: selections[r["image_id"]] for r in members if r["image_id"] in selections},
+                  limit, figures / "objects" / category)
+                 for (category, uid), members in _objects(rows).items()]
+        if workers > 1 and len(tasks) > 1:
+            with multiprocessing.get_context("spawn").Pool(min(workers, len(tasks))) as pool:
+                for saved in pool.imap_unordered(_object_task, tasks):
+                    paths += saved
+        else:
+            paths += [path for task in tasks for path in _object_task(task, db)]
     return paths
+
+
+def _object_task(task, db=None):
+    """One object's figures; worker processes open their own read connection."""
+    own = db is None
+    db = store.connect(task[0]["output_dir"]) if own else db
+    try:
+        return object_figure(db, *task)
+    finally:
+        if own:
+            db.close()
 
 
 def _objects(rows):
@@ -357,9 +388,33 @@ def _objects(rows):
     return grouped
 
 
-SELECTOR_FIGURES = {"oracle": "best SAM3D view per input (uses labels)",
+SELECTOR_FIGURES = {"view_relative_margin": "largest true-category margin over rivals (uses labels)",
+                    "oracle": "best SAM3D view per input (uses labels)",
                     "detector_entropy": "lowest SAM3 score entropy per input",
                     "detector_gap": "largest SAM3 top-1 minus top-2 gap per input"}
+
+
+def save_view_comparison(config, category, uid, members, before, picked_paths,
+                         after, selector, path, *, limit=None):
+    """One standard two-column comparison, indexed by each input camera."""
+    angles = [_angle(row) for row in members]
+    before_values = {angle: before.get(angle) for angle in angles}
+    after_values = {angle: after.get(angle) for angle in angles}
+    finite = [abs(value) for value in (*before_values.values(), *after_values.values())
+              if value is not None and math.isfinite(value)]
+    limit = limit or max(finite, default=1.0) or 1.0
+    output = Path(config["output_dir"])
+    panels = [
+        Images({_angle(row): output / row["path"] for row in members}, "input images"),
+        Images(picked_paths, f"optimized viewpoints: {selector}"),
+        margin_heatmap(before_values, "input confidence margin", limit, annotate=True),
+        margin_heatmap(after_values, "optimized confidence margin", limit, annotate=True),
+    ]
+    dataset = config["dataset"]
+    return save_panels(panels, dataset["azimuths"], dataset["elevations"], path,
+                       title=f"{category} / {uid}: {selector}",
+                       note="Cells align by input camera; chosen viewpoints use the reconstruction frame",
+                       ncols=2)
 
 
 def object_figure(db, config, category, uid, members, margins, selections, limit, directory):
@@ -395,18 +450,16 @@ def object_figure(db, config, category, uid, members, margins, selections, limit
                                  directory / "after" / f"{uid}.png",
                                  title=f"{category} / {uid}: reconstructed views",
                                  note="After maps indexed by input view", ncols=1))
-        for name, description in SELECTOR_FIGURES.items():
+        allowed = config["analysis"].get("figure_selectors") or list(SELECTOR_FIGURES)
+        for name in allowed:
+            if name == "input":
+                continue
             after = {_angle(r): selections[r["image_id"]][name]["margin"]
                      for r in done if name in selections[r["image_id"]]}
-            saved.append(save_panels(
-                [panels[2], Images(_picks(db, config, done, selections, name),
-                                   f"{name}: {description}"),
-                 margin_heatmap(before, "before: SAM3 margin on ground-truth view", limit,
-                                annotate=True),
-                 margin_heatmap(after, f"after: SAM3 margin on {name} view", limit, annotate=True)],
-                dataset["azimuths"], dataset["elevations"], directory / name / f"{uid}.png",
-                title=f"{category} / {uid}: {name} SAM3D views",
-                note="All panels indexed by input view (object frame)", ncols=2))
+            saved.append(save_view_comparison(
+                config, category, uid, members, before,
+                _picks(db, config, done, selections, name), after, name,
+                directory / name / f"{uid}.png", limit=limit))
     return saved
 
 
@@ -442,7 +495,7 @@ def reconstruction_figure(db, config, input_key, path):
     marks = {}
     for name in selector_names(metrics):
         picked = weights(name, list(result), scores, margins, metrics, angle, prompt_scores,
-                         config["analysis"]["combined_weights"]) or {}
+                         config["analysis"].get("combined_weights")) or {}
         marks[name] = {angle[i] for i in picked}
     primary = config["analysis"]["primary_selector"]
     panels = [margin_heatmap({angle[i]: m for i, m in margins.items()}, "SAM3 margin (oracle marked)",

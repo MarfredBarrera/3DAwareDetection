@@ -195,7 +195,7 @@ class Metric:
     score: object      # (context, candidate, **options) -> {"ambiguity": float | None, ...}
     defaults: dict
     validate: object   # (options) -> None, raises ValueError
-    prepare: object    # (reconstruction_dir, options, distance) -> context shared by all candidates
+    prepare: object    # (source, options, distance, target) -> context shared by all candidates
 
 
 def _visual_view(context, candidate, **options):
@@ -224,10 +224,11 @@ def _normal_options(options):
             raise ValueError(f"{name} must be an integer in [2, 180]")
 
 
-def _prepare_mesh(reconstruction_dir, options, distance):
-    return build_context(*load_mesh_npz(Path(reconstruction_dir) / "mesh.npz"),
-                         samples=options["samples"], seed=options["seed"],
-                         two_sided=options["two_sided"], distance=distance)
+def _prepare_mesh(source, options, distance, target=(0.0, 0.0, 0.0)):
+    """``source`` is a reconstruction directory or a ``(vertices, faces)`` mesh."""
+    mesh = source if isinstance(source, tuple) else load_mesh_npz(Path(source) / "mesh.npz")
+    return build_context(*mesh, samples=options["samples"], seed=options["seed"],
+                         two_sided=options["two_sided"], distance=distance, target=target)
 
 
 def _occlusion(context, candidate, **options):
@@ -244,7 +245,7 @@ def _normal_entropy(context, candidate, **options):
 _MESH_DEFAULTS = {"samples": 20000, "seed": 0, "two_sided": True}
 METRICS = {
     "visual_entropy": Metric(_visual_view, {"bins": 32}, _entropy_options,
-                             lambda reconstruction_dir, options, distance: None),
+                             lambda source, options, distance, target=None: None),
     "self_occlusion": Metric(_occlusion, _MESH_DEFAULTS, _mesh_options, _prepare_mesh),
     "surface_normal_entropy": Metric(
         _normal_entropy, _MESH_DEFAULTS | {"polar_bins": 9, "azimuth_bins": 18},
@@ -264,10 +265,11 @@ def metric_options(name, supplied=None):
     return options
 
 
-def score_candidates(reconstruction_dir, candidates, metrics, distance=1.0):
+def score_candidates(source, candidates, metrics, distance=1.0, target=(0.0, 0.0, 0.0)):
     """Score every candidate with every metric; ``metrics`` maps name -> options.
 
-    ``distance`` is the candidate camera distance from the reconstruction center.
+    ``source`` is a reconstruction directory (``mesh.npz``) or a ``(vertices,
+    faces)`` mesh; cameras look at ``target`` from ``distance``.
 
     Returns one ``{metric: ambiguity or None}`` dict per candidate, in order.
     Mesh preparation is shared between metrics with identical options.
@@ -279,7 +281,7 @@ def score_candidates(reconstruction_dir, candidates, metrics, distance=1.0):
         metric = METRICS[name]
         key = (metric.prepare, tuple(sorted((k, options[k]) for k in _MESH_DEFAULTS if k in options)))
         if key not in contexts:
-            contexts[key] = metric.prepare(reconstruction_dir, options, distance)
+            contexts[key] = metric.prepare(source, options, distance, target)
         for result, candidate in zip(results, candidates):
             result[name] = metric.score(contexts[key], candidate, **options)["ambiguity"]
     return results

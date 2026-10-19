@@ -15,7 +15,8 @@ from study import config as settings_io
 from study import db as store
 from study import figures
 from study.labels import outcomes
-from study.selectors import selector_names, weights
+from study.selectors import GT_SELECTORS, gt_view_weights, gt_vqf_field, selector_names, weights
+from viewactive.grid import Grid
 
 FIELDS = ("margin", "correct", "fp_rate", "any_fp", "tp")
 SUBSETS = {"all inputs": lambda before: True,
@@ -46,6 +47,18 @@ def select_all(db, config):
             children.setdefault(row["parent_id"], []).append(row["image_id"])
             angles[row["image_id"]] = (row["azimuth"], row["elevation"])
     size = len(vocabulary)
+    # Ground-truth-view selectors: Algorithm 1 on each object's ground-truth VQF.
+    gt_settings = config["analysis"].get("gt_vqf")
+    gt_scores = store.view_scores(db, "i.source='gt'") if gt_settings is not None else {}
+    grid = Grid(tuple(map(float, config["dataset"]["azimuths"])),
+                tuple(map(float, config["dataset"]["elevations"])))
+    cells, position = {}, {}
+    for row in store.images(db, "source='gt'"):
+        if row["image_id"] in before and row["image_id"] in gt_scores:
+            cell = (grid.elevations.index(row["elevation"]), grid.azimuths.index(row["azimuth"]))
+            cells.setdefault(row["uid"], {})[cell] = row["image_id"]
+            position[row["image_id"]] = (row["uid"], cell)
+    fields = {uid: gt_vqf_field(views, gt_scores, metrics, grid) for uid, views in cells.items()}
     result = {}
     for input_id, candidates in children.items():
         if input_id not in before:
@@ -54,12 +67,22 @@ def select_all(db, config):
         margins = {i: after[i]["margin"] for i in candidates}
         for name in names:
             weight = weights(name, candidates, scores, margins, metrics, angles, prompt_scores,
-                             config["analysis"]["combined_weights"])
+                             config["analysis"].get("combined_weights"))
             if weight is None:
                 continue
             values = {field: sum(w * _values(after[i], size)[field] for i, w in weight.items())
                       for field in FIELDS}
             rows[name] = {**values, "pick_id": max(weight, key=weight.get)}
+        if input_id in position:
+            uid, cell = position[input_id]
+            gt_margins = {i: before[i]["margin"] for i in cells[uid].values()}
+            for name in GT_SELECTORS:
+                weight = gt_view_weights(name, cell, cells[uid], fields[uid], gt_margins, grid, gt_settings)
+                if weight is None:
+                    continue
+                values = {field: sum(w * _values(before[i], size)[field] for i, w in weight.items())
+                          for field in FIELDS}
+                rows[name] = {**values, "pick_id": max(weight, key=weight.get)}
         result[input_id] = rows
     with db:
         db.execute("DELETE FROM selections")
@@ -109,7 +132,8 @@ def summarize(selections, objects, primary):
                 paired[reference] = {"improved": float(np.mean(difference > 1e-9)),
                                      "worse": float(np.mean(difference < -1e-9)),
                                      "mean_margin_change": float(difference.mean())}
-        summary["subsets"][subset] = {"selectors": table, f"{primary} vs": paired}
+        result = {"selectors": table, f"{primary} vs": paired}
+        summary["subsets"][subset] = result
     return summary
 
 
@@ -138,7 +162,10 @@ def write_markdown(summary, before, primary, path):
                          f"worse on {paired['worse']:.1%} (mean change {paired['mean_margin_change']:+.3f}).")
         lines.append("")
     lines += ["`input` is SAM3 on the original view; `identity` re-renders the reconstruction from "
-              "the input view; `oracle` picks the best candidate using SAM3 itself (upper bound).", ""]
+              "the input view; `oracle` picks the best candidate using SAM3 itself (upper bound). "
+              "`gt_*` selectors pick another ground-truth view of the same object: `gt_vqf` follows "
+              "the ground-truth VQF (Algorithm 1), `gt_random` and `gt_oracle` are its controls "
+              "(see study/selectors.py).", ""]
     Path(path).write_text("\n".join(lines))
 
 
@@ -147,6 +174,7 @@ def main():
     parser.add_argument("--settings", type=Path, required=True)
     parser.add_argument("--no-object-figures", action="store_true",
                         help="skip the per-object figures (the slow part)")
+    parser.add_argument("--workers", type=int, default=1, help="processes for per-object figures")
     args = parser.parse_args()
     config = settings_io.read(args.settings)
     output = Path(config["output_dir"])
@@ -166,7 +194,8 @@ def main():
     (output / "summary.json").write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n")
     write_markdown(summary, before, primary, output / "summary.md")
     paths = figures.study_figures(db, config, gt, selections, summary,
-                                  object_figures=not args.no_object_figures)
+                                  object_figures=not args.no_object_figures,
+                                  workers=args.workers)
     db.close()
     print(f"[analyze] {len(selections)} reconstructed inputs; {len(paths)} figures; "
           f"summary -> {output / 'summary.md'}", flush=True)

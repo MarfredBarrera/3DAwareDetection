@@ -13,6 +13,7 @@ import yaml
 
 from study import analyze, config as study_config, db as store, labels, selectors
 from study.figures import Heatmap, Images, margin_heatmap, save_bars, save_panels
+from study.__main__ import cohort, import_renders
 
 VOCABULARY = ["chair", "table", "desk"]
 DETECTION = {"score_threshold": 0.5, "iou_threshold": 0.5}
@@ -71,7 +72,9 @@ class SelectorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown selector"):
             self.pick("ambiguity:c")
         self.assertEqual(selectors.selector_names(["a"]),
-                         ["identity", "random", "ambiguity:a", "detector_entropy", "detector_gap", "oracle"])
+                         ["identity", "random", "ambiguity:a", "detector_entropy",
+                          "detector_gap", "view_relative_margin", "oracle"])
+        self.assertEqual(self.pick("view_relative_margin"), self.pick("oracle"))
 
     def test_detector_entropy_prefers_a_confident_view(self):
         self.assertAlmostEqual(selectors.detector_entropy({"a": 0.5, "b": 0.5}), 1.0)
@@ -87,6 +90,28 @@ class SelectorTests(unittest.TestCase):
         prompts = {1: {"a": 0.9, "b": 0.8}, 2: {"a": 0.2, "b": 0.7}, 3: {"a": 0.1, "b": 0.1}}
         self.assertEqual(selectors.weights("detector_gap", [1, 2, 3], self.scores, self.margins,
                                            ["a", "b"], self.angles, prompts), {2: 1.0})
+
+    def test_gt_vqf_selectors_follow_the_field_within_the_elevation_band(self):
+        from viewactive.grid import Grid
+
+        grid = Grid((0.0, 90.0, 180.0, 270.0), (0.0, 30.0, 60.0))
+        views = {(e, a): 10 * e + a for e in range(3) for a in range(4)}
+        # Visual-entropy ambiguity: lowest (best) at (60, 180), next best at (30, 90).
+        ambiguity = {i: 0.9 for i in views.values()}
+        ambiguity[22], ambiguity[11] = 0.0, 0.2
+        scores = {i: {"visual_entropy": a} for i, a in ambiguity.items()}
+        field = selectors.gt_vqf_field(views, scores, ["visual_entropy"], grid)
+        self.assertAlmostEqual(field[2, 2], 1.0)
+        margins = {i: 0.01 * i for i in views.values()}
+        settings = {"reach_cells": [1, 1], "steps": 4, "elevation_range": None}
+        pick = lambda name, settings: selectors.gt_view_weights(name, (0, 0), views, field, margins,
+                                                               grid, settings)
+        self.assertEqual(pick("gt_vqf", settings), {22: 1.0})
+        band = settings | {"elevation_range": [0, 30]}
+        self.assertEqual(pick("gt_vqf", band), {11: 1.0})
+        self.assertEqual(pick("gt_oracle", band), {13: 1.0})
+        self.assertEqual(sum(pick("gt_random", band).values()), 1.0)
+        self.assertEqual(len(pick("gt_random", band)), 8)
 
 
 class ConfigTests(unittest.TestCase):
@@ -116,6 +141,46 @@ class ConfigTests(unittest.TestCase):
                 path.write_text(yaml.safe_dump({**raw, **bad}))
                 with self.assertRaises(ValueError):
                     study_config.load(path)
+
+    def test_manifest_split_and_incremental_external_renders(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            shard = source / "renders" / "shard-000"
+            shard.mkdir(parents=True)
+            canonical = {"objects": {
+                "seen": {"category": "chair", "face_count": 100},
+                "unseen": {"category": "desk", "face_count": 100}}}
+            (root / "canonical.json").write_text(json.dumps(canonical))
+            (root / "objects.json").write_text(json.dumps({
+                "seen": {"category": "chair", "split": "train"},
+                "unseen": {"category": "desk", "split": "test_unseen"}}))
+            _image(shard / "rgb.png")
+            _image(shard / "mask.png", 255)
+            row = {"uid": "unseen", "category": "desk", "azimuth": 0.0,
+                   "elevation": 0.0, "modal_area": 64,
+                   "files": {"rgb": "rgb.png", "modal": "mask.png"}}
+            index = shard / "index.jsonl"
+            index.write_text(json.dumps(row) + "\n")
+            path = root / "study.yaml"
+            path.write_text(yaml.safe_dump({
+                "output_dir": "out", "dataset": {"canonical": "canonical.json",
+                "manifest": "objects.json", "split": "test_unseen", "source_run": "source",
+                "categories": ["chair", "desk"], "objects_per_category": 1,
+                "azimuths": [0], "elevations": [0]}}))
+            config = study_config.load(path)
+            # A benchmark can contain unseen classes only; its vocabulary can
+            # include more classes than the split, so use the eligible group.
+            config["dataset"]["categories"] = ["desk"]
+            groups = cohort(config)
+            self.assertEqual(groups, {"desk": ["unseen"]})
+            self.assertEqual(import_renders(config, groups), 1)
+            self.assertEqual(import_renders(config, groups), 1)
+            with store.connect(root / "out") as db:
+                imported = store.images(db, "source='gt'")
+                self.assertEqual(len(imported), 1)
+                self.assertEqual(imported[0]["uid"], "unseen")
+                self.assertTrue((root / "out" / imported[0]["path"]).is_file())
 
 
 def _image(path, value=128, size=8):
@@ -182,7 +247,26 @@ class AnalysisTests(unittest.TestCase):
             self.assertAlmostEqual(desk["identity"]["margin"], 0.0)  # candidate at (180, 0)
             self.assertAlmostEqual(desk["oracle"]["margin"], 0.3)
             self.assertAlmostEqual(desk["random"]["margin"], (0.3 - 0.4 + 0.0) / 3)
-            self.assertEqual(db.execute("SELECT COUNT(*) FROM selections").fetchone()[0], 4 * 7)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM selections").fetchone()[0], 4 * 8)
+            from study.compare import build as build_comparison
+            page = root / "figures" / "comparison" / "oracle" / "d1.png"
+            from study import figures
+            with patch("study.figures.save_panels", wraps=figures.save_panels) as save:
+                self.assertEqual(build_comparison(config, "d1", "oracle", page), page)
+            panels = save.call_args.args[0]
+            self.assertEqual([type(p).__name__ for p in panels],
+                             ["Images", "Images", "Heatmap", "Heatmap"])
+            self.assertEqual(save.call_args.kwargs["ncols"], 2)
+            self.assertAlmostEqual(panels[2].values[(0.0, 0.0)], -0.2)
+            self.assertAlmostEqual(panels[3].values[(0.0, 0.0)], 0.3)
+            self.assertTrue(page.is_file())
+            external = root / "figures" / "comparison" / "viewactive" / "d1.png"
+            self.assertEqual(build_comparison(
+                config, "d1", "viewactive", external,
+                picks={"viewactive": {"gt/d1/0": "sam3d/1/0"}}), external)
+            with self.assertRaisesRegex(ValueError, "not a candidate"):
+                build_comparison(config, "d1", "viewactive", external,
+                                 picks={"viewactive": {"gt/d1/0": "sam3d/1/99"}})
 
             objects = {i: ("d1" if i < 8 else "c1") for i in selections}
             summary = analyze.summarize(selections, objects, "ambiguity:visual_entropy")
@@ -194,7 +278,6 @@ class AnalysisTests(unittest.TestCase):
             analyze.write_markdown(summary, before, "ambiguity:visual_entropy", root / "summary.md")
             self.assertIn("| oracle |", (root / "summary.md").read_text())
 
-            from study import figures
             gt = labels.outcomes(db, VOCABULARY, DETECTION, "i.source='gt'")
             with patch("study.figures.save_panels", wraps=figures.save_panels) as save:
                 paths = figures.study_figures(db, config, gt, selections, summary)
@@ -213,6 +296,7 @@ class AnalysisTests(unittest.TestCase):
             self.assertEqual(figures._higher_scoring_categories(
                 {"desk": 0.4, "chair": 0.4, "table": 0.2}, "desk"), ())
             db.close()
+
 
 
 class PlotTests(unittest.TestCase):

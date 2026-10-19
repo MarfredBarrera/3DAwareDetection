@@ -20,7 +20,8 @@ def load_config(path, *, image=None, query=None):
         config["image"] = str(Path(image).expanduser().resolve())
     if query is not None:
         config["query"] = query
-    allowed = {"image", "query", "output_dir", "gpu_id", "preprocessing", "reconstruction", "visualization"}
+    allowed = {"image", "query", "output_dir", "gpu_id", "preprocessing", "reconstruction",
+               "verification", "visualization"}
     if config.keys() - allowed:
         raise ValueError(f"Unknown config settings: {sorted(config.keys() - allowed)}")
     for key in ("image", "query", "output_dir"):
@@ -44,6 +45,8 @@ def load_config(path, *, image=None, query=None):
                           "depth": None, "intrinsics": None},
         "reconstruction": {"checkpoint_dir": "/data/checkpoints/sam3d/hf", "views": 8,
                            "resolution": 512, "seed": 42},
+        "verification": {"enabled": True, "method": "majority", "score_threshold": 0.5,
+                         "rival_prompts": []},
         "visualization": {"enabled": True, "host": "0.0.0.0", "port": 7860},
     }
     for section, values in defaults.items():
@@ -54,6 +57,21 @@ def load_config(path, *, image=None, query=None):
     prep = config["preprocessing"]
     recon = config["reconstruction"]
     viewer = config["visualization"]
+    verification = config["verification"]
+    if (type(verification["enabled"]) is not bool
+            or verification["method"] not in ("majority", "lower_quartile",
+                                               "relative_margin", "peak_margin")):
+        raise ValueError("verification.enabled must be boolean and method must be a known rule")
+    if (not isinstance(verification["score_threshold"], (int, float))
+            or not 0 <= verification["score_threshold"] <= 1):
+        raise ValueError("verification.score_threshold must be between 0 and 1")
+    rivals = verification["rival_prompts"]
+    if (not isinstance(rivals, list) or not all(isinstance(p, str) and p.strip() for p in rivals)
+            or len(set(rivals)) != len(rivals) or config["query"] in rivals):
+        raise ValueError("verification.rival_prompts must be distinct prompts other than query")
+    if (verification["enabled"] and verification["method"] in ("relative_margin", "peak_margin")
+            and not rivals):
+        raise ValueError(f"{verification['method']} requires verification.rival_prompts")
     if not isinstance(prep["threshold"], (int, float)) or not 0 <= prep["threshold"] <= 1:
         raise ValueError("preprocessing.threshold must be between 0 and 1")
     if type(prep["max_masks"]) is not int or prep["max_masks"] < 1:
@@ -142,7 +160,10 @@ def reconstruct(settings):
         print(f"Reconstructing and rendering object {index + 1}/{len(config['masks'])}", flush=True)
         model.render_views(config["prepared_image"], mask, directory, views=recon["views"],
                            resolution=recon["resolution"], seed=recon["seed"],
-                           pointmap=config["pointmap"])
+                           pointmap=config["pointmap"],
+                           view_grid=([0, 45, 90, 135, 180, 225, 270, 315], [0, 30, 60])
+                           if config["verification"]["enabled"] else None,
+                           view_distance=2.0, also_turntable=config["verification"]["enabled"])
         objects.append(directory / "object.ply")
         timing = getattr(model, "last_timing", None)
         if isinstance(timing, dict):
@@ -158,8 +179,59 @@ def reconstruct(settings):
             json.dumps({"model_load_included": False, "objects": timings}, indent=2) + "\n"
         )
     print(f"Saved reconstructions and visualizations to {output}", flush=True)
+
+
+def verify(settings):
+    """Score reconstructed views and write an accept/reject decision for each mask."""
+    from PIL import Image
+    import numpy as np
+    from reconstruction.segmentation import SAM3Preprocessor
+    from study.fp_verification import verify_claim
+
+    config = json.loads(Path(settings).read_text())
+    if not config["verification"]["enabled"]:
+        return
+    configure_gpu(config)
+    output = Path(config["output_dir"])
+    prompt = config["query"]
+    verification = config["verification"]
+    predictions = json.loads((output / "masks" / "predictions.json").read_text())
+    detector = SAM3Preprocessor(checkpoint=config["preprocessing"]["checkpoint"], threshold=0.0)
+    decisions = []
+    for index, input_score in enumerate(predictions["scores"]):
+        directory = output / f"object-{index:03d}" / "views"
+        raw_views = []
+        for elevation in (0, 30, 60):
+            for azimuth in (0, 45, 90, 135, 180, 225, 270, 315):
+                path = directory / f"azimuth_{azimuth:g}_elevation_{elevation:g}.png"
+                with Image.open(path) as source:
+                    detections = detector.detect_many(source.convert("RGB"),
+                                                       [prompt, *verification["rival_prompts"]])
+                scores = {}
+                for name, found in detections.items():
+                    valid = found["scores"][np.isfinite(found["scores"])]
+                    scores[name] = float(valid.max()) if valid.size else 0.0
+                raw_views.append((azimuth, elevation, scores))
+        views = [scores for _, _, scores in raw_views]
+        accepted = verify_claim(prompt, input_score, views, method=verification["method"],
+                                score_threshold=verification["score_threshold"])
+        decisions.append({"mask": config["masks"][index], "input_score": input_score,
+                          "accepted": accepted, "views": len(views),
+                          "scores": [view[prompt] for view in views]})
+        print(f"[verify] object {index}: {'accept' if accepted else 'reject'}", flush=True)
+    (output / "verification.json").write_text(json.dumps({
+        "query": prompt, "method": verification["method"],
+        "score_threshold": verification["score_threshold"], "objects": decisions,
+    }, indent=2) + "\n")
+
+
+def view(settings):
+    config = json.loads(Path(settings).read_text())
     if config["visualization"]["enabled"]:
         from reconstruction.sam3d import launch_viewer
+        output = Path(config["output_dir"])
+        objects = [output / f"object-{index:03d}" / "object.ply"
+                   for index in range(len(config["masks"]))]
         launch_viewer(objects, host=config["visualization"]["host"],
                       port=config["visualization"]["port"])
 
@@ -175,7 +247,12 @@ def run_pipeline(config_path, *, image=None, query=None, no_viewer=False, output
     # Both interpreters consume the same resolved settings, independent of cwd.
     settings = output / "run.json"
     settings.write_text(json.dumps(config, indent=2) + "\n")
-    for environment, function in (("core", "prepare"), ("sam3d", "reconstruct")):
+    stages = [("core", "prepare"), ("sam3d", "reconstruct")]
+    if config["verification"]["enabled"]:
+        stages.append(("core", "verify"))
+    if config["visualization"]["enabled"]:
+        stages.append(("sam3d", "view"))
+    for environment, function in stages:
         subprocess.run(
             ["sam3d-env", environment, "python", str(WORKSPACE / "main.py"),
              "--worker", function, "--config", str(settings)],
@@ -192,10 +269,11 @@ def main():
     parser.add_argument("--query", help="SAM3 text prompt; overrides the config")
     parser.add_argument("--no-viewer", action="store_true", help="Save outputs and exit")
     parser.add_argument("--output-dir", type=Path, help="Override the output directory")
-    parser.add_argument("--worker", choices=("prepare", "reconstruct"), help=argparse.SUPPRESS)
+    parser.add_argument("--worker", choices=("prepare", "reconstruct", "verify", "view"), help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.worker:
-        {"prepare": prepare, "reconstruct": reconstruct}[args.worker](args.config)
+        {"prepare": prepare, "reconstruct": reconstruct, "verify": verify,
+         "view": view}[args.worker](args.config)
     else:
         run_pipeline(args.config, image=args.image, query=args.query,
                      no_viewer=args.no_viewer, output_dir=args.output_dir)

@@ -10,6 +10,18 @@ from pathlib import Path
 WORKSPACE = Path(__file__).resolve().parents[1]
 
 
+def no_huge_pages():
+    """Disable transparent huge pages for this process and its children.
+
+    THP faults on the shared host stall in direct compaction; the stall counts
+    as memory pressure and systemd-oomd then kills the whole container.
+    """
+    import ctypes
+    PR_SET_THP_DISABLE = 41
+    if ctypes.CDLL(None, use_errno=True).prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0) != 0:
+        print(f"warning: PR_SET_THP_DISABLE failed (errno {ctypes.get_errno()})", flush=True)
+
+
 def use_gpu(gpu_id):
     """Restrict this process to one host GPU; call before importing torch."""
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)

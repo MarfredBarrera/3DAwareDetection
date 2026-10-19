@@ -41,4 +41,6 @@ services:
       - ${OUTPUT_DIR:-./outputs}:/outputs
       # Objaverse slice on the NAS; read-only, the harness never writes here.
       - ${OBJAVERSE_DIR:-/ICONAS/users/marfred/objaverse}:/data/objaverse_nas:ro
+      # ViewActive GLB downloads; large, so kept on the NAS (writable).
+      - ${VIEWACTIVE_OBJAVERSE_DIR:-/ICONAS/users/marfred/objaverse_viewactive}:/data/objaverse_viewactive
     command: [bash]

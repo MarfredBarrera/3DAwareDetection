@@ -1,0 +1,25 @@
+# Small renderer validation; full paper resolution is in viewactive_blender.yaml.
+output_dir: ../outputs/viewactive/blender_smoke
+gpu_id: 3
+cohort:
+  seen_classes: [chair, vase, table_lamp, television_set]
+  unseen_classes: [bookcase]
+  per_class: 3
+  total_seen: null
+  unseen_per_class: 2
+  oversample: 3
+  exclude_uids_from: [../outputs/upright/canonical.json]
+render:
+  backend: blender
+  width: 320
+  height: 280
+  distance: 1.4
+  samples: 8
+  shard_size: 2
+labels:
+  samples: 5000
+  workers: 4
+train:
+  epochs: 3
+optimize:
+  starts_per_object: 2

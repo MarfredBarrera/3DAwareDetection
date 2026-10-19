@@ -1,0 +1,13 @@
+# Corrected global 70/5/25 object split on the existing 1,800-object cohort.
+# Cached renders, labels, and encoder features are reused from the full run;
+# this is an intermediate reproducibility baseline until Blender rendering is ready.
+output_dir: ../outputs/viewactive/fidelity_split
+gpu_id: 3
+cohort:
+  seen_classes: 56
+  unseen_classes: 10
+  per_class: 29
+  total_seen: 1600
+  unseen_per_class: 20
+  oversample: 2.0
+  exclude_uids_from: [../outputs/upright/canonical.json]

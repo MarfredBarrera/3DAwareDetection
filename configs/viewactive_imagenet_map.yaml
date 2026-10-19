@@ -1,0 +1,104 @@
+# LVIS category (Objaverse-LVIS) -> ImageNet-1k classes that count as a correct
+# top-1 prediction. Keys are ImageNet indices in timm's ImageNetInfo order; values
+# are the start of each class description, checked by tests/test_viewactive.py.
+# A "first-last" key covers an inclusive index range (descriptions unchecked).
+# Categories without a clean ImageNet-1k counterpart (helicopter, skateboard,
+# globe, sword, fire hydrant, giraffe, rhinoceros, wristwatch, ...) are omitted.
+# Less certain mappings are marked "unsure".
+chair: {423: barber chair, 559: folding chair, 765: rocking chair, 857: throne}
+shield: {787: shield}
+banana: {954: banana}
+mushroom: {947: mushroom, 992: agaric, 997: bolete}
+fighter_jet: {895: warplane}
+"monitor_(computer_equipment) computer_monitor": {664: monitor, 782: screen, 527: desktop computer}
+mug: {504: coffee mug}
+owl: {24: great grey owl}
+shoe: {770: running shoe, 630: Loafer, 502: clog, 774: sandal, 514: cowboy boot}
+soccer_ball: {805: soccer ball}
+rifle: {764: rifle, 413: assault rifle}
+teddy_bear: {850: teddy}
+bicycle: {671: mountain bike, 444: bicycle-built-for-two}
+guitar: {402: acoustic guitar, 546: electric guitar}
+race_car: {751: racer, 817: sports car}
+lion: {291: lion}
+mask: {643: mask}                                   # unsure: masks in LVIS include costume heads
+pumpkin: {607: jack-o'-lantern}                     # unsure: only carved pumpkins exist in ImageNet-1k
+rabbit: {330: wood rabbit, 331: hare, 332: Angora}
+telephone: {528: dial telephone, 707: pay-phone, 487: cellular telephone}
+elephant: {101: tusker, 385: Indian elephant, 386: African elephant}
+airplane: {404: airliner, 895: warplane}
+crab_(animal): {118: Dungeness crab, 119: rock crab, 120: fiddler crab, 121: king crab}
+lampshade: {619: lampshade}
+toilet: {861: toilet seat}
+pickup_truck: {717: pickup}
+fan: {545: electric fan}
+shark: {2: great white shark, 3: tiger shark, 4: hammerhead}
+piano: {579: grand piano, 881: upright}
+vase: {883: vase}
+sunglasses: {836: sunglass, 837: sunglasses}
+wolf: {269: timber wolf, 270: white wolf, 271: red wolf, 272: coyote}
+frog: {30: bullfrog, 31: tree frog, 32: tailed frog}
+bookcase: {453: bookcase}
+penguin: {145: king penguin}
+spider: {72: black and gold garden spider, 73: barn spider, 74: garden spider, 75: black widow,
+         76: tarantula, 77: wolf spider}
+car_(automobile): {436: beach wagon, 468: cab, 511: convertible, 609: jeep, 627: limousine,
+                   656: minivan, 661: Model T, 751: racer, 817: sports car}
+table: {532: dining table, 526: desk}               # unsure: LVIS "table" is broad
+television_set: {851: television, 664: monitor, 782: screen}
+wineglass: {572: goblet, 966: red wine}
+butterfly: {321: admiral, 322: ringlet, 323: monarch, 324: cabbage butterfly, 325: sulphur butterfly,
+            326: lycaenid}
+crate: {519: crate}
+necklace: {679: necklace}
+computer_keyboard: {508: computer keyboard, 878: typewriter keyboard}
+manhole: {640: manhole cover}
+pizza: {963: pizza}
+helmet: {518: crash helmet, 560: football helmet}
+drum_(musical_instrument): {541: drum}
+pistol: {763: revolver}
+radio_receiver: {754: radio}
+bench: {703: park bench}
+boot: {514: cowboy boot}
+table_lamp: {846: table lamp}
+army_tank: {847: tank}
+horse: {339: sorrel}
+turtle: {33: loggerhead, 34: leatherback turtle, 35: mud turtle, 36: terrapin, 37: box turtle}
+violin: {889: violin}
+dresser: {493: chiffonier}                          # unsure: chest of drawers
+cat: {281: tabby, 282: tiger cat, 283: Persian cat, 284: Siamese cat, 285: Egyptian cat}
+dog: {151-268: dog breeds}
+bowl: {659: mixing bowl, 809: soup bowl}
+balloon: {417: balloon}
+vending_machine: {886: vending machine}
+sofa: {831: studio couch}
+jeep: {609: jeep}
+traffic_light: {920: traffic light}
+water_bottle: {898: water bottle}
+hog: {341: hog, 342: wild boar}
+basketball: {430: basketball}
+cock: {7: cock, 8: hen}
+teapot: {849: teapot}
+tractor_(farm_equipment): {866: tractor}
+barrel: {427: barrel}
+gorilla: {366: gorilla}
+pitcher_(vessel_for_liquid): {725: pitcher}
+alarm_clock: {409: analog clock, 530: digital clock}
+beer_bottle: {440: beer bottle}
+bus_(vehicle): {654: minibus, 779: school bus, 874: trolleybus}
+motor_scooter: {670: motor scooter, 665: moped}
+cup: {968: cup, 504: coffee mug}
+dining_table: {532: dining table}
+tiger: {292: tiger}
+camera: {732: Polaroid camera, 759: reflex camera}
+giant_panda: {388: giant panda}
+bucket: {463: bucket}
+microphone: {650: microphone}
+trash_can: {412: ashcan}
+backpack: {414: backpack}
+starfish: {327: starfish}
+space_shuttle: {812: space shuttle}
+pineapple: {953: pineapple}
+remote_control: {761: remote control}
+refrigerator: {760: refrigerator}
+strawberry: {949: strawberry}

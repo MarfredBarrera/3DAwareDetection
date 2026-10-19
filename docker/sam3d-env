@@ -50,8 +50,10 @@ fi
 if [ "$#" = 0 ]; then exec bash --norc; fi
 if [ -n "${CPU_LIMIT:-}" ] && command -v cpulimit >/dev/null 2>&1; then
   # Attach to this PID before exec: foreground cpulimit discards the child's
-  # exit status, which would hide worker failures from main.py.
-  cpulimit -b -z -l "$CPU_LIMIT" -p "$$"
+  # exit status, which would hide worker failures from main.py. Detach its stdio:
+  # holding the worker's stdout pipe open keeps run_in_env from seeing EOF, so it
+  # never reaps the worker and cpulimit -z waits on the zombie forever.
+  cpulimit -b -z -l "$CPU_LIMIT" -p "$$" </dev/null >/dev/null 2>&1
 elif [ -n "${CPU_LIMIT:-}" ]; then
   echo 'sam3d-env: cpulimit is unavailable; continuing without a CPU limit' >&2
 fi

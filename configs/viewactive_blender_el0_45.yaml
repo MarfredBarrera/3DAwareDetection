@@ -1,0 +1,23 @@
+# Evaluation-only variant of viewactive_blender.yaml: the same data and model
+# (copied from the archived run), optimizer targets limited to elevations 0..45.
+output_dir: ../outputs/viewactive/blender_full_el0_45
+gpu_id: 2
+cohort:
+  seen_classes: 56
+  unseen_classes: 10
+  per_class: 29
+  total_seen: 1600
+  unseen_per_class: 20
+  oversample: 2.0
+  exclude_uids_from: [../outputs/upright/canonical.json]
+render:
+  backend: blender
+  width: 1920
+  height: 1680
+  distance: 1.4
+  samples: 8
+  shard_size: 25
+labels:
+  samples: 20000
+optimize:
+  elevation_range: [0, 45]

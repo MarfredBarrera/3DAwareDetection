@@ -1,0 +1,18 @@
+# ViewActive smoke test: 14 objects already on the NAS slice, every stage, minutes.
+output_dir: ../outputs/viewactive/smoke
+gpu_id: 1
+cohort:
+  seen_classes: [chair, vase, table_lamp, television_set]
+  unseen_classes: [bookcase]
+  per_class: 3
+  total_seen: null
+  unseen_per_class: 2
+  oversample: 3
+  exclude_uids_from: [../outputs/upright/canonical.json]
+labels:
+  samples: 5000
+  workers: 4
+train:
+  epochs: 3
+optimize:
+  starts_per_object: 2

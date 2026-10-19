@@ -34,7 +34,7 @@ class VisualEntropyTests(unittest.TestCase):
             Image.new("L", (4, 4), 255).save(root / "a.mask.png")
             candidate = {"azimuth": 0, "elevation": 0, "image": root / "a.png", "mask": root / "a.mask.png"}
             constant = Metric(lambda context, view: {"ambiguity": 0.25}, {}, lambda options: None,
-                              lambda directory, options, distance: None)
+                              lambda source, options, distance, target: None)
             with unittest.mock.patch.dict(METRICS, {"constant": constant}):
                 scores = score_candidates(root, [candidate], {"constant": {}, "visual_entropy": {}})
             self.assertEqual(scores, [{"constant": 0.25, "visual_entropy": 1.0}])

@@ -3,7 +3,7 @@
 # chosen per input view. Paths are relative to this file.
 # Check nvidia-smi and set gpu_id to an idle GPU before running.
 output_dir: ../outputs/upright
-gpu_id: 1
+gpu_id: 3
 
 dataset:
   root: /data/objaverse_nas
@@ -43,6 +43,11 @@ ambiguity:
 
 analysis:
   primary_selector: ambiguity:combined
+  figure_selectors: [identity, random, ambiguity:combined, detector_entropy,
+                     detector_gap, view_relative_margin, oracle, gt_vqf, gt_random, gt_oracle]
   # Weights of each metric's within-input rank in ambiguity:combined (missing
   # metrics get 0; null = equal). Analysis-only: rerun with --stages analyze.
   combined_weights: {visual_entropy: 0.2, self_occlusion: 0.4, surface_normal_entropy: 0.4}
+  # gt_* selectors: Algorithm 1 on each object's ground-truth VQF (ground-truth
+  # views scored with the same metrics), targets limited to elevations 0..45.
+  gt_vqf: {reach_cells: [1, 1], steps: 9, elevation_range: [0, 45]}

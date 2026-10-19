@@ -63,11 +63,16 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "views"):
             main.load_config(self.save())
 
+    def test_verification_requires_rivals_for_relative_margin(self):
+        self.config["verification"] = {"method": "relative_margin"}
+        with self.assertRaisesRegex(ValueError, "rival_prompts"):
+            main.load_config(self.save())
+
     def test_environment_order_and_resolved_handoff(self):
         with patch("main.subprocess.run") as run:
             output = main.run_pipeline(self.save())
         calls = run.call_args_list
-        self.assertEqual([call.args[0][1] for call in calls], ["core", "sam3d"])
+        self.assertEqual([call.args[0][1] for call in calls], ["core", "sam3d", "core"])
         self.assertTrue(all(call.kwargs["check"] for call in calls))
         self.assertEqual(json.loads((output / "run.json").read_text())["image"], str(self.image))
 
@@ -143,11 +148,36 @@ class PipelineTests(unittest.TestCase):
         with patch("reconstruction.sam3d.SAM3D", return_value=model), \
                 patch("reconstruction.sam3d.launch_viewer") as viewer:
             main.reconstruct(settings)
+            main.view(settings)
         self.assertEqual(model.render_views.call_count, 2)
         self.assertEqual([call.args[1] for call in model.render_views.call_args_list],
                          ["mask-a.png", "mask-b.png"])
         self.assertEqual(viewer.call_args.args[0],
                          [output / "object-000/object.ply", output / "object-001/object.ply"])
+
+    def test_verification_worker_writes_veto_decision(self):
+        from PIL import Image
+        config = main.load_config(self.save())
+        output = Path(config["output_dir"])
+        directory = output / "object-000/views"
+        directory.mkdir(parents=True)
+        for elevation in (0, 30, 60):
+            for azimuth in (0, 45, 90, 135, 180, 225, 270, 315):
+                Image.new("RGB", (8, 8)).save(
+                    directory / f"azimuth_{azimuth}_elevation_{elevation}.png")
+        masks = output / "masks"
+        masks.mkdir()
+        (masks / "predictions.json").write_text(json.dumps({"scores": [0.9]}))
+        config.update(masks=["mask-a.png"])
+        settings = output / "run.json"
+        settings.write_text(json.dumps(config))
+        with patch("reconstruction.segmentation.SAM3Preprocessor") as detector:
+            detector.return_value.detect_many.return_value = {
+                "chair": {"scores": __import__("numpy").array([0.2])}}
+            main.verify(settings)
+        decision = json.loads((output / "verification.json").read_text())
+        self.assertFalse(decision["objects"][0]["accepted"])
+        self.assertEqual(decision["objects"][0]["views"], 24)
 
 
 if __name__ == "__main__":

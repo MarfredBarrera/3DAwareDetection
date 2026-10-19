@@ -17,18 +17,34 @@ GPU work.
   a distribution over the vocabulary, have the lowest entropy. Label-free.
 - ``detector_gap``: the candidate with the largest gap between SAM3's top two
   category scores. Label-free; equals the oracle margin when top-1 is correct.
+- ``view_relative_margin``: the largest true-category score minus the strongest
+  rival. Uses labels and is equivalent to ``oracle`` on this full vocabulary.
 - ``oracle``: the candidate with the best SAM3 margin (an upper bound; uses labels).
+
+Ground-truth-view selectors pick another *ground-truth* view of the input's
+object instead of a SAM3D candidate (``analysis.gt_vqf``; needs scored
+ground-truth views):
+
+- ``gt_vqf``: ViewActive Algorithm 1 from the input view on the object's
+  ground-truth VQF (per metric, quality = 1 - ambiguity min-max normalized over
+  the object's views; equal mean), within the configured reach, steps and
+  elevation range.
+- ``gt_random``: a uniformly random ground-truth view in the elevation range.
+- ``gt_oracle``: the ground-truth view in the elevation range with the best
+  SAM3 margin (uses labels).
 """
 import numpy as np
 
 from tools.cameras import SAM3D_INPUT_VIEW
+
+GT_SELECTORS = ("gt_vqf", "gt_random", "gt_oracle")
 
 
 def selector_names(metrics):
     names = ["identity", "random", *(f"ambiguity:{name}" for name in metrics)]
     if len(metrics) > 1:
         names.append("ambiguity:combined")
-    return names + ["detector_entropy", "detector_gap", "oracle"]
+    return names + ["detector_entropy", "detector_gap", "view_relative_margin", "oracle"]
 
 
 def detector_entropy(prompt_scores):
@@ -87,7 +103,7 @@ def weights(name, candidate_ids, scores, margins, metrics, angles, prompt_scores
         return None
     if name == "random":
         return {i: 1 / len(ids) for i in ids}
-    if name == "oracle":
+    if name in ("oracle", "view_relative_margin"):
         return _pick(ids, [margins[i] for i in ids], best=max)
     if name == "detector_entropy":
         return _pick(ids, [detector_entropy(prompt_scores[i]) for i in ids])
@@ -103,3 +119,44 @@ def weights(name, candidate_ids, scores, margins, metrics, angles, prompt_scores
     if name.startswith("ambiguity:") and name.removeprefix("ambiguity:") in metrics:
         return _pick(ids, [scores.get(i, {}).get(name.removeprefix("ambiguity:")) for i in ids])
     raise ValueError(f"Unknown selector {name!r}; choices: {selector_names(metrics)}")
+
+
+def gt_vqf_field(views, scores, metrics, grid):
+    """Ground-truth VQF ``[E, A]`` of one object; ``views`` = {(e, a): image_id}."""
+    from viewactive.grid import combine
+    from viewactive.labels import normalize
+
+    raw = np.full((len(metrics), *grid.shape), np.nan)
+    for (e, a), image_id in views.items():
+        for m, metric in enumerate(metrics):
+            value = scores.get(image_id, {}).get(metric)
+            if value is not None:
+                raw[m, e, a] = 1 - value
+    return combine(normalize(raw))
+
+
+def gt_view_weights(name, start, views, field, margins, grid, settings):
+    """Weights over one object's ground-truth views for the input at grid cell ``start``.
+
+    ``views`` = {(e, a): image_id}, ``field`` from ``gt_vqf_field``, ``margins`` =
+    {image_id: margin}, ``settings`` = ``analysis.gt_vqf``.
+    """
+    from viewactive.grid import elevation_rows, to_relative
+    from viewactive.optimize import field_policy, rollout
+
+    limits = settings["elevation_range"]
+    allowed = elevation_rows(grid, limits)
+    ids = [i for (e, a), i in views.items() if allowed[e] and i in margins]
+    if not ids:
+        return None
+    if name == "gt_random":
+        return {i: 1 / len(ids) for i in ids}
+    if name == "gt_oracle":
+        return _pick(ids, [margins[i] for i in ids], best=max)
+    if name == "gt_vqf":
+        reach = settings["reach_cells"]
+        policy = field_policy(lambda e, a: to_relative(field, a), grid,
+                              None if reach is None else tuple(reach), limits)
+        final = rollout(policy, start, settings["steps"])[-1]
+        return {views[final]: 1.0} if views.get(final) in margins else None
+    raise ValueError(f"Unknown ground-truth selector {name!r}; choices: {GT_SELECTORS}")

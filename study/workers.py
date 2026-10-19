@@ -36,21 +36,40 @@ def directory_for(image):
     return f"renders/sam3d/{image['uid']}/a{image['azimuth']:g}_e{image['elevation']:g}"
 
 
+_STORE = None
+
+
+def _canonical_mesh(root, canonical, uid):
+    """(vertices, faces) of a ground-truth object in the reviewed render frame."""
+    global _STORE
+    from harness.meshio import ObjaverseStore
+
+    if _STORE is None or (_STORE.root, _STORE.canonical_path) != (root, canonical):
+        _STORE = ObjaverseStore(root, canonical)
+        _STORE.canonical_path = canonical
+    mesh = _STORE.load(uid, device="cpu")
+    if mesh is None:
+        raise RuntimeError(f"unloadable mesh {uid}")
+    return mesh.verts.numpy().astype(np.float64), mesh.faces.numpy().astype(np.int32)
+
+
 def _score(task):
-    """Worker: all metrics for one reconstruction; returns (image_id, metric, value) rows."""
+    """Worker: all metrics for one reconstruction, or for all ground-truth views of one
+    object (``source = (root, canonical, uid)``); returns (label, rows, error)."""
     from study.ambiguity import score_candidates
 
-    output, directory, candidates, metrics, distance = task
+    output, label, source, candidates, metrics, distance, target = task
     output = Path(output)
     views = [{"azimuth": c["azimuth"], "elevation": c["elevation"],
               "image": output / c["path"], "mask": output / c["mask_path"]} for c in candidates]
     try:
-        values = score_candidates(output / directory, views, metrics, distance)
+        mesh = _canonical_mesh(*source) if isinstance(source, tuple) else output / source
+        values = score_candidates(mesh, views, metrics, distance, target)
     except Exception as error:  # One bad mesh must not stop the stage.
-        return directory, [], f"{type(error).__name__}: {error}"
+        return label, [], f"{type(error).__name__}: {error}"
     rows = [(candidate["image_id"], metric, score)
             for candidate, value in zip(candidates, values) for metric, score in value.items()]
-    return directory, rows, None
+    return label, rows, None
 
 
 def reconstruct(config, limit=None):
@@ -76,7 +95,9 @@ def reconstruct(config, limit=None):
                 output / image["path"], output / image["mask_path"], output / relative,
                 resolution=recon["resolution"], seed=recon["seed"],
                 view_grid=(recon["candidate_azimuths"], recon["candidate_elevations"]),
-                save_ply=False, view_distance=recon["candidate_distance"])
+                save_ply=False, save_gaussians=recon["save_gaussians"],
+                view_distance=recon["candidate_distance"],
+                input_elevation=image["elevation"])
             if not (output / relative / "mesh.npz").is_file():
                 raise RuntimeError("SAM3D returned no mesh; mesh ambiguity metrics need one")
         except Exception as error:  # Recorded per input; the remaining inputs continue.
@@ -105,6 +126,10 @@ def reconstruct(config, limit=None):
 
 
 def score(config, workers=4):
+    """Ambiguity metrics for every SAM3D candidate (reconstructed mesh) and every
+    visible ground-truth view (canonical mesh, harness camera)."""
+    from tools.cameras import HARNESS_LOOK_AT
+
     output = Path(config["output_dir"])
     metrics = config["ambiguity"]
     wanted = len(metrics)
@@ -118,8 +143,21 @@ def score(config, workers=4):
             "SELECT COUNT(*) FROM view_scores s JOIN images i USING (image_id)"
             " WHERE i.parent_id=?", (input_id,)).fetchone()[0]
         if scored < wanted * len(candidates):
-            tasks.append((str(output), directory, candidates, metrics, distance))
-    print(f"[score] {len(tasks)} reconstructions to score with {sorted(metrics)}", flush=True)
+            tasks.append((str(output), directory, directory, candidates, metrics, distance, (0.0, 0.0, 0.0)))
+    reconstructions = len(tasks)
+    dataset = config["dataset"]
+    scored = {row[0] for row in db.execute(
+        "SELECT s.image_id FROM view_scores s JOIN images i USING (image_id) WHERE i.source='gt'"
+        " GROUP BY s.image_id HAVING COUNT(*) >= ?", (wanted,))}
+    views = {}
+    for image in store.images(db, "source='gt' AND visible_px > 0"):
+        views.setdefault(image["uid"], []).append(image)
+    for uid, images in views.items():
+        if any(image["image_id"] not in scored for image in images):
+            tasks.append((str(output), f"gt/{uid}", (dataset["root"], dataset["canonical"], uid), images,
+                          metrics, dataset["distance"], tuple(HARNESS_LOOK_AT)))
+    print(f"[score] {reconstructions} reconstructions and {len(tasks) - reconstructions} ground-truth "
+          f"objects to score with {sorted(metrics)}", flush=True)
     if not tasks:
         return
     failures = 0
@@ -136,7 +174,7 @@ def score(config, workers=4):
     db.close()
 
 
-def detect(config):
+def detect(config, limit=None):
     use_gpu(config["gpu_id"])
 
     from reconstruction.segmentation import SAM3Preprocessor
@@ -145,7 +183,16 @@ def detect(config):
     output = Path(config["output_dir"])
     vocabulary = config["dataset"]["categories"]
     db = store.connect(output)
-    pending = store.images(db, "image_id NOT IN (SELECT image_id FROM detections)")
+    condition = "image_id NOT IN (SELECT image_id FROM detections)"
+    if limit is not None:
+        # A bounded pilot should cover one reconstructed input and its views,
+        # rather than spend its entire budget on the GT rows imported first.
+        condition += (" AND (i.parent_id IN (SELECT input_id FROM reconstructions"
+                      " WHERE status='ok') OR i.image_id IN"
+                      " (SELECT input_id FROM reconstructions WHERE status='ok'))")
+    pending = store.images(db, condition)
+    if limit is not None:
+        pending = pending[:limit]
     print(f"[detect] {len(pending)} images without detections", flush=True)
     if not pending:
         return
@@ -188,7 +235,7 @@ def main():
     elif args.stage == "score":
         score(config, args.workers)
     else:
-        detect(config)
+        detect(config, args.limit)
 
 
 if __name__ == "__main__":

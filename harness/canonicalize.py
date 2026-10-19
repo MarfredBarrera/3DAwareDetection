@@ -79,6 +79,8 @@ def main() -> None:
     ap.add_argument("--out", default=None, help="default: <root>/canonical.json")
     ap.add_argument("--max-mb", type=float, default=64.0, help="skip GLBs larger than this")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--trust-file-up", action="store_true",
+                    help="keep the glTF +Y up axis; the audit is still recorded in up_axis_detected")
     args = ap.parse_args()
 
     root = args.root
@@ -127,7 +129,7 @@ def main() -> None:
         cat = u2c[uid][0]
         target = cat_median[cat]
         best = int(np.argmin([abs(r["ratios"][a] - target) for a in range(3)]))
-        R = axis_swap(best)
+        R = axis_swap(UP if args.trust_file_up else best)
 
         # Reload: extents must come from every vertex. azimuth_frame may
         # subsample internally, since PCA is statistical, but the bbox may not.

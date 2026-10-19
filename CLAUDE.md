@@ -25,6 +25,8 @@ reusable plots, and all images, angles, and scores stored in the study database.
 - **Cameras**: one y-up az/el convention in `tools/cameras.py`. Ground-truth
   angles are in the reviewed object frame; SAM3D candidate angles are relative
   to the input camera, and (180, 0) re-renders the input view (verified visually).
+  SAM3D candidate cameras use gravity as up (`tools.cameras.sam3d_gravity`, from
+  the input elevation); studies reconstructed before 2026-10-18 were rolled.
 - **Controls** for any after-result: `identity` (re-render from the input view),
   `random`, and `oracle`. An ambiguity selector only counts if it beats
   `identity` and `random`.
@@ -35,7 +37,10 @@ reusable plots, and all images, angles, and scores stored in the study database.
 
 - `python -m study --config configs/<name>.yaml` runs render -> reconstruct ->
   score -> detect -> analyze. Stages resume. Outputs are in `outputs/<study>/`,
-  with `study.sqlite` as the source of truth. See README.md.
+  with `study.sqlite` as the source of truth. See README.md. `outputs/` and
+  `data/` stay on the server; archive large finished datasets (e.g. completed
+  render runs) to `/ICONAS/users/marfred/3DAwareVerification/` and delete the
+  local copy (home quota is 300 GB).
 - New metric: register it in `study/ambiguity.py` and add it to the config's
   `ambiguity` section. New selector: `study/selectors.py`. New plot: compose
   `study.figures` panels. None of these needs new GPU work.
