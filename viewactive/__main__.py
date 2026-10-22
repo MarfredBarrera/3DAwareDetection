@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 
 from study import config as settings_io
-from tools.envs import no_huge_pages, run_in_env, use_gpu
+from tools.envs import run_in_env, use_gpu
 from viewactive import cohort as cohorts
 from viewactive.grid import Grid
 
@@ -353,7 +353,6 @@ def main():
     args = parser.parse_args()
     if args.device == "cpu" and "evaluate" in args.stages and not args.no_fps:
         parser.error("CPU evaluation requires --no-fps")
-    no_huge_pages()
     config = settings_io.load_viewactive(args.config)
     if args.gpu is not None:
         config["gpu_id"] = args.gpu

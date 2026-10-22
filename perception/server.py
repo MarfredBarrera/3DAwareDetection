@@ -167,8 +167,6 @@ def serve(argv):
     parser.add_argument("--log-dir", type=Path, default=Path("outputs/perception_server"))
     args = parser.parse_args(argv)
 
-    from tools.envs import no_huge_pages
-    no_huge_pages()
     args.log_dir.mkdir(parents=True, exist_ok=True)
     settings = {"selector": args.selector, "ensemble": not args.no_ensemble,
                 "threshold": None if args.no_ensemble else args.threshold,

@@ -17,12 +17,8 @@ import tempfile
 import traceback
 from pathlib import Path
 
-# Before numpy is imported: huge-page advice stalls the shared host until
-# systemd-oomd kills the container (see tools.envs.no_huge_pages).
-os.environ.setdefault("NUMPY_MADVISE_HUGEPAGE", "0")
-
-from perception.images import decode, encode  # noqa: E402
-from tools.envs import no_huge_pages, use_gpu  # noqa: E402
+from perception.images import decode, encode
+from tools.envs import use_gpu
 
 
 def _iou(a, b):
@@ -118,7 +114,6 @@ def main():
     parser.add_argument("--viewactive", help="ViewActive checkpoint (sam3d role; enables the vqf op)")
     args = parser.parse_args()
     use_gpu(args.gpu)
-    no_huge_pages()
     replies = os.fdopen(os.dup(1), "w", buffering=1)
     os.dup2(2, 1)
     sys.stdout = sys.stderr

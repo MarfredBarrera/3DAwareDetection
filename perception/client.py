@@ -83,8 +83,7 @@ class _Worker:
     def __init__(self, env, args, launcher, log):
         command = [part.format(env=env) for part in launcher] + ["python", "-m", "perception.worker", *args]
         self.log = open(log, "a") if log else None
-        environment = {**os.environ, "NUMPY_MADVISE_HUGEPAGE": "0"}
-        self.process = subprocess.Popen(command, cwd=WORKSPACE, env=environment, text=True, bufsize=1,
+        self.process = subprocess.Popen(command, cwd=WORKSPACE, text=True, bufsize=1,
                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.log)
         self.lock = threading.Lock()
         self.name = " ".join(command)

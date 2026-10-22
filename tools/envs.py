@@ -10,18 +10,6 @@ from pathlib import Path
 WORKSPACE = Path(__file__).resolve().parents[1]
 
 
-def no_huge_pages():
-    """Disable transparent huge pages for this process and its children.
-
-    THP faults on the shared host stall in direct compaction; the stall counts
-    as memory pressure and systemd-oomd then kills the whole container.
-    """
-    import ctypes
-    PR_SET_THP_DISABLE = 41
-    if ctypes.CDLL(None, use_errno=True).prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0) != 0:
-        print(f"warning: PR_SET_THP_DISABLE failed (errno {ctypes.get_errno()})", flush=True)
-
-
 def use_gpu(gpu_id):
     """Restrict this process to one host GPU; call before importing torch."""
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
@@ -30,10 +18,7 @@ def use_gpu(gpu_id):
 def run_in_env(env, module, args, *, gpu_id, log=None):
     """Run ``python -m module args`` in ``env``, streaming output to stdout and ``log``."""
     command = ["sam3d-env", env, "python", "-m", module, *map(str, args)]
-    environment = {**os.environ, "CUDA_VISIBLE_DEVICES": str(gpu_id),
-                   # Huge-page advice on repeated mask allocations stalled the shared
-                   # host's cgroup until systemd-oomd killed the container.
-                   "NUMPY_MADVISE_HUGEPAGE": os.environ.get("NUMPY_MADVISE_HUGEPAGE", "0")}
+    environment = {**os.environ, "CUDA_VISIBLE_DEVICES": str(gpu_id)}
     print(f"$ {' '.join(command)}", flush=True)
     stream = open(log, "a", buffering=1) if log else None
     try:
