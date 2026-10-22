@@ -5,6 +5,7 @@ import math
 from pathlib import Path
 
 from study.ambiguity import metric_options
+from study.labels import prompt_text as _prompt
 
 DEFAULTS = {
     "gpu_id": 0,
@@ -12,6 +13,8 @@ DEFAULTS = {
                     "sam3d": "/data/checkpoints/sam3d/hf"},
     "dataset": {"root": "/data/objaverse_nas", "canonical": "/data/objaverse_nas/canonical.json",
                 "manifest": None, "split": None, "source_run": None,
+                # Import only N views per object from source_run (hash-chosen per uid).
+                "views_per_object": None,
                 "require_upright_verified": False, "categories": None,
                 "objects_per_category": 10,
                 "azimuths": [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330],
@@ -21,10 +24,14 @@ DEFAULTS = {
                        "candidate_azimuths": [0, 45, 90, 135, 180, 225, 270, 315],
                        "candidate_elevations": [0, 30, 60], "candidate_distance": 2.0,
                        "resolution": 320, "seed": 42,
-                       # Also write each reconstruction's Gaussians (gaussians.npz),
-                       # e.g. for Jacobian uncertainty; only adds files.
-                       "save_gaussians": False},
+                       # Stage-1 seed ensemble size written to stage1.npz while
+                       # reconstructing (1 = none). Not fingerprinted: it only adds a file.
+                       "ensemble": 1},
     "ambiguity": {"visual_entropy": {}, "self_occlusion": {}, "surface_normal_entropy": {}},
+    # Pre-detect view picks (study.selectors.PICK_SELECTORS); null disables the
+    # pick stage. vqf: a ViewActive vqf.npz of ground-truth fields; detect_only
+    # runs SAM3 on the inputs and picked candidates only.
+    "picks": None,
     # gt_vqf: Algorithm 1 settings for the gt_* selectors (null disables them);
     # elevation_range [low, high] degrees limits its targets.
     "analysis": {"primary_selector": "ambiguity:combined", "combined_weights": None,
@@ -34,14 +41,20 @@ DEFAULTS = {
 # Settings each stage's stored outputs depend on. Thresholds, input selection,
 # and analysis settings are applied later and may change freely.
 FINGERPRINTS = {
-    "render": lambda c: c["dataset"],
-    "detect": lambda c: [c["dataset"]["categories"], c["checkpoints"]["sam3"]],
+    # views_per_object is left out when unset to keep earlier studies' fingerprints.
+    "render": lambda c: {k: v for k, v in c["dataset"].items()
+                         if k != "views_per_object" or v is not None},
+    "detect": lambda c: [c["dataset"]["categories"], c["checkpoints"]["sam3"]] + (
+        # Prompts differ from the names only for LVIS-style categories.
+        ["lvis-prompts"] if any(_prompt(n) != n for n in c["dataset"]["categories"]) else []),
     "reconstruct": lambda c: [c["checkpoints"]["sam3d"]] + [
         c["reconstruction"][k] for k in ("candidate_azimuths", "candidate_elevations",
                                          "candidate_distance", "resolution", "seed")] + [
         "gravity-up"],  # Candidate cameras keep gravity up (earlier studies were rolled).
     "score": lambda c: c["ambiguity"],
+    "pick": lambda c: c["picks"],
 }
+PICK_DEFAULTS = {"vqf": None, "elevation_range": [0, 45], "seed": 0, "detect_only": True}
 
 
 def _number(value, name, low=-math.inf, high=math.inf):
@@ -105,11 +118,16 @@ def load(path):
             dataset[key] = resolve(dataset[key], f"dataset.{key}")
     if dataset["manifest"] is None and dataset["split"] is not None:
         raise ValueError("dataset.split requires dataset.manifest")
-    if dataset["manifest"] is not None and (
-            not isinstance(dataset["split"], str) or not dataset["split"].strip()):
-        raise ValueError("dataset.manifest requires a nonempty dataset.split")
+    splits = dataset["split"] if isinstance(dataset["split"], list) else [dataset["split"]]
+    if dataset["manifest"] is not None and not (
+            splits and all(isinstance(s, str) and s.strip() for s in splits)):
+        raise ValueError("dataset.manifest requires a nonempty dataset.split (name or list)")
     if dataset["source_run"] is not None and dataset["manifest"] is None:
         raise ValueError("dataset.source_run requires dataset.manifest")
+    if dataset["views_per_object"] is not None:
+        _integer(dataset["views_per_object"], "dataset.views_per_object", 1)
+        if dataset["source_run"] is None:
+            raise ValueError("dataset.views_per_object requires dataset.source_run")
     categories = dataset["categories"]
     if (not isinstance(categories, list) or len(categories) < 2
             or not all(isinstance(c, str) and c.strip() for c in categories)
@@ -147,14 +165,28 @@ def load(path):
     _number(recon["candidate_distance"], "reconstruction.candidate_distance", 0.5, 10)
     _integer(recon["resolution"], "reconstruction.resolution", 64)
     _integer(recon["seed"], "reconstruction.seed", 0)
-    if not isinstance(recon["save_gaussians"], bool):
-        raise ValueError("reconstruction.save_gaussians must be true or false")
+    _integer(recon["ensemble"], "reconstruction.ensemble", 1)
     config["reconstruction"] = recon
 
     metrics = raw.get("ambiguity", DEFAULTS["ambiguity"])
     if not isinstance(metrics, dict) or not metrics:
         raise ValueError("ambiguity must map at least one metric name to its options")
     config["ambiguity"] = {name: metric_options(name, options or {}) for name, options in metrics.items()}
+
+    config["picks"] = None
+    if raw.get("picks") is not None:
+        picks = config["picks"] = _merge(PICK_DEFAULTS, raw["picks"], "picks")
+        if picks["vqf"] is None:
+            raise ValueError("picks.vqf must name a ViewActive vqf.npz")
+        picks["vqf"] = resolve(picks["vqf"], "picks.vqf")
+        limits = picks["elevation_range"]
+        if limits is not None and (not isinstance(limits, list) or len(limits) != 2
+                                   or _number(limits[0], "picks.elevation_range", -90, 90)
+                                   > _number(limits[1], "picks.elevation_range", -90, 90)):
+            raise ValueError("picks.elevation_range must be [low, high] degrees or null")
+        _integer(picks["seed"], "picks.seed", 0)
+        if type(picks["detect_only"]) is not bool:
+            raise ValueError("picks.detect_only must be a boolean")
 
     analysis = _merge(DEFAULTS["analysis"], raw.get("analysis"), "analysis")
     from study.selectors import GT_SELECTORS, selector_names

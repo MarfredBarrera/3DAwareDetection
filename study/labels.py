@@ -12,8 +12,16 @@ mask-IoU thresholds (else FN); each wrong prompt is FP if its score passes the
 score threshold (else TN). Invisible targets are skipped.
 """
 import math
+import re
 
 import numpy as np
+
+
+def prompt_text(category):
+    """SAM3 text for an LVIS-style category name: first synonym, no
+    disambiguating parenthetical, spaces for underscores ("car_(automobile)" -> "car")."""
+    name = re.sub(r"_?\(.*?\)", "", category.split(" ")[0])
+    return name.replace("_", " ").strip()
 
 
 def mask_iou(a, b):

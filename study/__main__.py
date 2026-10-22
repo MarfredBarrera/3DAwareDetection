@@ -10,9 +10,12 @@ resumes after an interruption. Stage logs are appended to <output_dir>/logs/.
 """
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
+
+import numpy as np
 
 from tools.envs import run_in_env
 from harness.upright import verify_cameras
@@ -32,8 +35,8 @@ def cohort(config):
     if manifest is not None:
         if not isinstance(manifest, dict):
             raise ValueError("dataset.manifest must map UIDs to category and split")
-        selected = {uid: row for uid, row in manifest.items()
-                    if row.get("split") == dataset["split"]}
+        splits = dataset["split"] if isinstance(dataset["split"], list) else [dataset["split"]]
+        selected = {uid: row for uid, row in manifest.items() if row.get("split") in splits}
         if not selected:
             raise ValueError(f"No objects in split {dataset['split']!r}")
         missing = set(selected) - set(objects)
@@ -87,6 +90,23 @@ def register_external(db, output, rows):
     return count
 
 
+def object_views(uid, azimuths, elevations, count):
+    """``count`` (azimuth, elevation) views of an object, fixed by a hash of its uid."""
+    grid = sorted((a, e) for a in azimuths for e in elevations)
+    rng = np.random.default_rng(int(hashlib.sha256(uid.encode()).hexdigest()[:16], 16))
+    return {grid[i] for i in rng.choice(len(grid), size=min(count, len(grid)), replace=False)}
+
+
+def sample_views(chosen, azimuths, elevations, count):
+    """Keep the hash-chosen views of each object among {(uid, az, el): render}."""
+    keep = {}
+    for uid in {uid for uid, _, _ in chosen}:
+        keep.update({(uid, a, e): chosen[(uid, a, e)]
+                     for a, e in object_views(uid, azimuths, elevations, count)
+                     if (uid, a, e) in chosen})
+    return keep
+
+
 def import_renders(config, groups):
     """Import available views from a running ViewActive render job incrementally."""
     output = Path(config["output_dir"])
@@ -107,9 +127,12 @@ def import_renders(config, groups):
                     if row["category"] not in groups or uid not in groups[row["category"]]:
                         raise ValueError(f"External render category differs from split: {uid}")
                     chosen[key] = (index, row)
+    if config["dataset"]["views_per_object"] is not None:
+        chosen = sample_views(chosen, azimuths, elevations, config["dataset"]["views_per_object"])
     with store.connect(output) as db:
         count = register_external(db, output, chosen.values())
-    expected = len(expected_uids) * len(azimuths) * len(elevations)
+    expected = len(expected_uids) * (config["dataset"]["views_per_object"]
+                                     or len(azimuths) * len(elevations))
     print(f"[render] imported {count}/{expected} Blender views from {source_run}; "
           f"{len({uid for uid, _, _ in chosen})}/{len(expected_uids)} objects have started",
           flush=True)
@@ -168,8 +191,9 @@ def gt_key(uid, azimuth, elevation):
     return f"gt/{uid}/a{float(azimuth):g}_e{float(elevation):g}"
 
 
-STAGES = ("render", "reconstruct", "score", "detect", "analyze")
-WORKERS = {"reconstruct": "sam3d", "score": "sam3d", "detect": "core", "analyze": "core"}
+STAGES = ("render", "reconstruct", "score", "pick", "detect", "analyze")
+WORKERS = {"reconstruct": "sam3d", "score": "sam3d", "pick": "core", "detect": "core", "analyze": "core"}
+CHEAP = {"score": "view_scores", "pick": "picks"}  # Stored results cleared when settings change.
 
 
 def check_fingerprints(db, config, stages):
@@ -179,11 +203,11 @@ def check_fingerprints(db, config, stages):
         stored = store.get_meta(db, key)
         if stored is None or stored == value:
             store.set_meta(db, key, value)
-        elif stage == "score":
-            # Ambiguity scores are cheap to recompute; everything else is not.
-            print("[study] ambiguity settings changed; clearing stored scores", flush=True)
+        elif stage in CHEAP:
+            # Scores and picks are cheap to recompute; everything else is not.
+            print(f"[study] {stage} settings changed; clearing {CHEAP[stage]}", flush=True)
             with db:
-                db.execute("DELETE FROM view_scores")
+                db.execute(f"DELETE FROM {CHEAP[stage]}")
             store.set_meta(db, key, value)
         else:
             raise ValueError(f"{stage} settings changed since this study was created; "

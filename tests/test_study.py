@@ -13,7 +13,7 @@ import yaml
 
 from study import analyze, config as study_config, db as store, labels, selectors
 from study.figures import Heatmap, Images, margin_heatmap, save_bars, save_panels
-from study.__main__ import cohort, import_renders
+from study.__main__ import cohort, import_renders, object_views
 
 VOCABULARY = ["chair", "table", "desk"]
 DETECTION = {"score_threshold": 0.5, "iou_threshold": 0.5}
@@ -32,6 +32,12 @@ class LabelTests(unittest.TestCase):
         self.assertFalse(labels.true_positive({"scores": [0.3], "ious": [0.9]}, 0.5, 0.5))
         self.assertFalse(labels.true_positive(None, 0.5, 0.5))
 
+    def test_prompt_text_cleans_lvis_names(self):
+        self.assertEqual(labels.prompt_text("car_(automobile)"), "car")
+        self.assertEqual(labels.prompt_text("monitor_(computer_equipment) computer_monitor"), "monitor")
+        self.assertEqual(labels.prompt_text("traffic_light"), "traffic light")
+        self.assertEqual(labels.prompt_text("chair"), "chair")
+
     def test_top1_breaks_ties_by_vocabulary_order(self):
         self.assertEqual(labels.top1({"chair": 0.4, "table": 0.8, "desk": 0.8}, VOCABULARY), "table")
         with self.assertRaisesRegex(ValueError, "exactly"):
@@ -46,6 +52,26 @@ class LabelTests(unittest.TestCase):
         self.assertFalse(result["correct"])
         self.assertIsNone(labels.outcome({"category": "desk", "visible_px": 0}, {}, None,
                                          VOCABULARY, DETECTION))
+
+
+class PickTests(unittest.TestCase):
+    def test_gt_vqf_max_takes_the_candidate_nearest_the_constrained_maximum(self):
+        from viewactive.grid import Grid
+        grid = Grid((0.0, 90.0, 180.0, 270.0), (0.0, 45.0, 90.0))
+        field = np.zeros(grid.shape)
+        field[2, 0] = 1.0  # global maximum above the band
+        field[0, 1] = 0.5  # best view within elevations 0-45: azimuth 90, elevation 0
+        source = {"image_id": 7, "azimuth": 0.0, "elevation": 0.0}
+        # With a level input, candidate azimuth 180 is the input view (absolute 0),
+        # so absolute azimuth 90 is candidate azimuth 270.
+        candidates = [{"image_id": i, "azimuth": a, "elevation": 0.0}
+                      for i, a in enumerate((0.0, 90.0, 180.0, 270.0))]
+        picked = selectors.picks(source, candidates, field, grid, [0, 45], seed=0)
+        self.assertEqual(picked["gt_vqf_max"][0], 3)
+        self.assertAlmostEqual(picked["gt_vqf_max"][1]["error_deg"], 0.0, places=4)
+        self.assertEqual(picked["identity"][0], 2)
+        self.assertEqual(picked["random"], selectors.picks(source, candidates, None, grid, None, 0)["random"])
+        self.assertNotIn("gt_vqf_max", selectors.picks(source, candidates, None, grid, None, 0))
 
 
 class SelectorTests(unittest.TestCase):
@@ -73,8 +99,7 @@ class SelectorTests(unittest.TestCase):
             self.pick("ambiguity:c")
         self.assertEqual(selectors.selector_names(["a"]),
                          ["identity", "random", "ambiguity:a", "detector_entropy",
-                          "detector_gap", "view_relative_margin", "oracle"])
-        self.assertEqual(self.pick("view_relative_margin"), self.pick("oracle"))
+                          "detector_gap", "oracle"])
 
     def test_detector_entropy_prefers_a_confident_view(self):
         self.assertAlmostEqual(selectors.detector_entropy({"a": 0.5, "b": 0.5}), 1.0)
@@ -182,6 +207,45 @@ class ConfigTests(unittest.TestCase):
                 self.assertEqual(imported[0]["uid"], "unseen")
                 self.assertTrue((root / "out" / imported[0]["path"]).is_file())
 
+    def test_views_per_object_imports_hash_chosen_views_from_split_list(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shard = root / "source" / "renders" / "shard-000"
+            (root / "canonical.json").write_text(json.dumps({"objects": {
+                "a": {"category": "chair", "face_count": 100},
+                "b": {"category": "desk", "face_count": 100}}}))
+            (root / "objects.json").write_text(json.dumps({
+                "a": {"category": "chair", "split": "train"},
+                "b": {"category": "desk", "split": "test_unseen"}}))
+            rows = []
+            for uid, category in (("a", "chair"), ("b", "desk")):
+                for azimuth in (0.0, 90.0):
+                    for elevation in (0.0, 30.0):
+                        name = f"{uid}_{azimuth:g}_{elevation:g}"
+                        _image(shard / f"{name}.rgb.png")
+                        _image(shard / f"{name}.mask.png", 255)
+                        rows.append({"uid": uid, "category": category, "azimuth": azimuth,
+                                     "elevation": elevation, "modal_area": 64,
+                                     "files": {"rgb": f"{name}.rgb.png", "modal": f"{name}.mask.png"}})
+            (shard / "index.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+            path = root / "study.yaml"
+            path.write_text(yaml.safe_dump({
+                "output_dir": "out", "dataset": {"canonical": "canonical.json",
+                "manifest": "objects.json", "split": ["train", "test_unseen"],
+                "source_run": "source", "views_per_object": 1,
+                "categories": ["chair", "desk"], "objects_per_category": 1,
+                "azimuths": [0, 90], "elevations": [0, 30]}}))
+            config = study_config.load(path)
+            groups = cohort(config)
+            self.assertEqual(groups, {"chair": ["a"], "desk": ["b"]})
+            self.assertEqual(import_renders(config, groups), 2)
+            with store.connect(root / "out") as db:
+                imported = store.images(db, "source='gt'")
+            self.assertEqual(
+                {(r["uid"], r["azimuth"], r["elevation"]) for r in imported},
+                {(uid, *view) for uid in "ab"
+                 for view in object_views(uid, [0.0, 90.0], [0.0, 30.0], 1)})
+
 
 def _image(path, value=128, size=8):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -247,7 +311,7 @@ class AnalysisTests(unittest.TestCase):
             self.assertAlmostEqual(desk["identity"]["margin"], 0.0)  # candidate at (180, 0)
             self.assertAlmostEqual(desk["oracle"]["margin"], 0.3)
             self.assertAlmostEqual(desk["random"]["margin"], (0.3 - 0.4 + 0.0) / 3)
-            self.assertEqual(db.execute("SELECT COUNT(*) FROM selections").fetchone()[0], 4 * 8)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM selections").fetchone()[0], 4 * 7)
             from study.compare import build as build_comparison
             page = root / "figures" / "comparison" / "oracle" / "d1.png"
             from study import figures

@@ -44,7 +44,7 @@ ambiguity:
 analysis:
   primary_selector: ambiguity:combined
   figure_selectors: [identity, random, ambiguity:combined, detector_entropy,
-                     detector_gap, view_relative_margin, oracle, gt_vqf, gt_random, gt_oracle]
+                     detector_gap, oracle, gt_vqf, gt_random, gt_oracle]
   # Weights of each metric's within-input rank in ambiguity:combined (missing
   # metrics get 0; null = equal). Analysis-only: rerun with --stages analyze.
   combined_weights: {visual_entropy: 0.2, self_occlusion: 0.4, surface_normal_entropy: 0.4}

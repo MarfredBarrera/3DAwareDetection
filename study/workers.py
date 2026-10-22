@@ -95,9 +95,9 @@ def reconstruct(config, limit=None):
                 output / image["path"], output / image["mask_path"], output / relative,
                 resolution=recon["resolution"], seed=recon["seed"],
                 view_grid=(recon["candidate_azimuths"], recon["candidate_elevations"]),
-                save_ply=False, save_gaussians=recon["save_gaussians"],
+                save_ply=False,
                 view_distance=recon["candidate_distance"],
-                input_elevation=image["elevation"])
+                input_elevation=image["elevation"], ensemble=recon["ensemble"])
             if not (output / relative / "mesh.npz").is_file():
                 raise RuntimeError("SAM3D returned no mesh; mesh ambiguity metrics need one")
         except Exception as error:  # Recorded per input; the remaining inputs continue.
@@ -174,16 +174,54 @@ def score(config, workers=4):
     db.close()
 
 
+def pick(config):
+    """Pre-detect view picks for every reconstructed input (``picks`` config)."""
+    from study.selectors import picks
+    from viewactive.grid import Grid, combine
+
+    settings = config.get("picks")
+    if settings is None:
+        print("[pick] no picks configured", flush=True)
+        return
+    vqf = np.load(settings["vqf"])
+    grid = Grid(tuple(map(float, vqf["azimuths"])), tuple(map(float, vqf["elevations"])))
+    fields = {str(uid): o for o, uid in enumerate(vqf["uids"])}
+    norm = vqf["norm"]
+    db = store.connect(Path(config["output_dir"]))
+    done = {row[0] for row in db.execute("SELECT DISTINCT input_id FROM picks")}
+    pending = [image for image in store.images(db, "i.image_id IN (SELECT input_id FROM reconstructions"
+                                                " WHERE status='ok')") if image["image_id"] not in done]
+    missing = 0
+    with db:
+        for image in pending:
+            o = fields.get(image["uid"])
+            missing += o is None
+            field = None if o is None else combine(norm[o])
+            candidates = store.images(db, "i.parent_id=?", (image["image_id"],))
+            for selector, (pick_id, meta) in picks(image, candidates, field, grid,
+                                                   settings["elevation_range"], settings["seed"]).items():
+                db.execute("INSERT OR REPLACE INTO picks VALUES (?, ?, ?, ?)",
+                           (image["image_id"], selector, pick_id, store.pack(meta)))
+    print(f"[pick] {len(pending)} inputs picked ({missing} without a ground-truth VQF)", flush=True)
+    db.close()
+
+
 def detect(config, limit=None):
     use_gpu(config["gpu_id"])
 
     from reconstruction.segmentation import SAM3Preprocessor
-    from study.labels import mask_iou
+    from study.labels import mask_iou, prompt_text
 
     output = Path(config["output_dir"])
     vocabulary = config["dataset"]["categories"]
+    # Detections stay keyed by category; SAM3 sees the cleaned prompt text.
+    prompts = {category: prompt_text(category) for category in vocabulary}
+    if len(set(prompts.values())) != len(prompts):
+        raise ValueError(f"categories share a SAM3 prompt: {prompts}")
     db = store.connect(output)
     condition = "image_id NOT IN (SELECT image_id FROM detections)"
+    if (config.get("picks") or {}).get("detect_only"):
+        condition += " AND (i.source='gt' OR i.image_id IN (SELECT pick_id FROM picks))"
     if limit is not None:
         # A bounded pilot should cover one reconstructed input and its views,
         # rather than spend its entire budget on the GT rows imported first.
@@ -202,7 +240,8 @@ def detect(config, limit=None):
         with Image.open(output / image["path"]) as source:
             rgb = source.convert("RGB")
         category = image["category"]
-        found = model.detect_many(rgb, vocabulary, spatial_queries={category})
+        found = model.detect_many(rgb, list(prompts.values()), spatial_queries={prompts[category]})
+        found = {name: found[prompts[name]] for name in vocabulary}
         rows = {}
         for prompt, detection in found.items():
             scores = detection["scores"][np.isfinite(detection["scores"])]
@@ -224,7 +263,7 @@ def detect(config, limit=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--stage", required=True, choices=("reconstruct", "score", "detect"))
+    parser.add_argument("--stage", required=True, choices=("reconstruct", "score", "pick", "detect"))
     parser.add_argument("--settings", type=Path, required=True)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--workers", type=int, default=4)
@@ -234,6 +273,8 @@ def main():
         reconstruct(config, args.limit)
     elif args.stage == "score":
         score(config, args.workers)
+    elif args.stage == "pick":
+        pick(config)
     else:
         detect(config, args.limit)
 

@@ -11,6 +11,7 @@ from PIL import Image
 from study.ambiguity import METRICS, Metric, metric_options, score_candidates, visual_entropy
 from tools.cameras import direction
 from reconstruction.sam3d import render_view_grid
+from tools.cameras import sam3d_gravity
 
 HAS_OPEN3D = importlib.util.find_spec("open3d") is not None and importlib.util.find_spec("trimesh")
 
@@ -58,11 +59,13 @@ class RenderGridTests(unittest.TestCase):
 
             def fake_render(_gaussian, **kwargs):
                 calls.append((kwargs["yaw_start_deg"], kwargs["pitch_deg"]))
+                np.testing.assert_allclose(kwargs["up"], sam3d_gravity(30))
                 color = np.full((1, 64, 64, 3), kwargs["bg_color"][0], dtype=np.float32)
                 color[:, 16:48, 16:48] = 0.5
                 return {"color": color}
 
-            views = render_view_grid(None, fake_render, directory, [0, 180], [0, 30], 64)
+            views = render_view_grid(None, fake_render, directory, [0, 180], [0, 30], 64,
+                                     up=sam3d_gravity(30))
             self.assertEqual(calls, [a for a in [(0, 0), (180, 0), (0, 30), (180, 30)] for _ in range(2)])
             self.assertEqual(len(views), 4)
             with Image.open(Path(directory) / views[0]["mask"]) as mask:

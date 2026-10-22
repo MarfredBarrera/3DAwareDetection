@@ -58,6 +58,15 @@ CREATE TABLE IF NOT EXISTS reconstructions (
     seconds REAL,
     error TEXT
 );
+-- Written by the pick stage, before detection: the candidate each pick
+-- selector chooses for each input; meta holds its angles and target.
+CREATE TABLE IF NOT EXISTS picks (
+    input_id INTEGER NOT NULL REFERENCES images(image_id),
+    selector TEXT NOT NULL,
+    pick_id INTEGER NOT NULL REFERENCES images(image_id),
+    meta BLOB,
+    PRIMARY KEY (input_id, selector)
+);
 -- Derived by the analyze stage (rebuilt on every run): the outcome of each
 -- selector for each input. 'input' is the unmodified ground-truth view (before).
 -- Values are weighted means over the selector's picks (random = expectation).

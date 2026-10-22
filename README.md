@@ -99,10 +99,8 @@ The PNG at `outputs/upright/figures/comparison/<selector>/<uid>.png` has two
 columns: the input image grid and its confidence-margin heatmap on the left;
 the selected-view image grid and its margin heatmap on the right. Both grids
 are indexed by input camera, so corresponding cells align. Swap
-`--selector` for `oracle`, `view_relative_margin`,
-`ambiguity:combined`, `detector_entropy`, or another stored selector.
-`view_relative_margin` and `oracle` make the same picks on this vocabulary
-and require labels. To compare an external method such as ViewActive on the
+`--selector` for `oracle` (requires labels),
+`ambiguity:combined`, `detector_entropy`, or another stored selector. To compare an external method such as ViewActive on the
 *same study inputs and candidate grid*, use `--selector viewactive --picks
 path/to/picks.json`. The JSON format is
 `{"viewactive": {"gt/<uid>/a0_e0": "sam3d/<candidate-key>"}}`; each candidate
@@ -124,7 +122,7 @@ sam3d-env sam3d python -m study --config configs/unseen_blender.yaml --stages sc
 sam3d-env core python -m study --config configs/unseen_blender.yaml --stages detect
 sam3d-env core python -m study --config configs/unseen_blender.yaml --stages analyze --workers 1 --no-object-figures
 sam3d-env core python -m study.fp_verification --config configs/unseen_blender.yaml
-sam3d-env core python -m study.compare --config configs/unseen_blender.yaml --all --selectors oracle detector_entropy view_relative_margin ambiguity:visual_entropy
+sam3d-env core python -m study.compare --config configs/unseen_blender.yaml --all --selectors oracle detector_entropy ambiguity:visual_entropy
 ```
 
 The final two commands write aggregate FP-rate and TP-recall graphs under
@@ -146,8 +144,8 @@ Everything goes under the config's `output_dir`:
   of wrong categories whose scores exceed the true category, and its viewpoint
   grid. Bars show mean (true score − wrong score) over the views where that
   category wins. When reconstruction results exist, `after/` shows the identity
-  and selected-view margins and chosen views, and `oracle/`, `detector_entropy/`,
-  `view_relative_margin/` and other selector folders show the input and chosen SAM3D views
+  and selected-view margins and chosen views, and `oracle/`, `detector_entropy/`
+  and other selector folders show the input and chosen SAM3D views
   above the before and after margins.
 - `figures/explore/`: on-demand reconstruction grids with SAM3 margins and entropy scores.
 - `figures/after/`: before/after false-positive maps, accuracy and false-positive

@@ -40,6 +40,7 @@ class Heatmap:
     label: str = ""
     annotate: bool = False       # print each value in its cell
     marks: set = field(default_factory=set)  # cells to outline
+    mark_color: str = "lime"
     rivals: dict = field(default_factory=dict)  # angle -> wrong categories scoring above true
     codes: dict = field(default_factory=dict)   # category -> compact plot label
 
@@ -49,6 +50,7 @@ class Images:
     paths: dict                  # (azimuth, elevation) -> image path
     title: str
     marks: set = field(default_factory=set)
+    mark_color: str = "lime"
 
 
 @dataclass
@@ -100,11 +102,11 @@ def _axes(ax, azimuths, elevations, title):
     ax.set_title(title, fontsize=10)
 
 
-def _outline(ax, marks, azimuths, elevations):
+def _outline(ax, marks, azimuths, elevations, color="lime"):
     for azimuth, elevation in marks:
         if azimuth in azimuths and elevation in elevations:
             ax.add_patch(Rectangle((azimuths.index(azimuth) - 0.5, elevations.index(elevation) - 0.5),
-                                   1, 1, fill=False, edgecolor="lime", linewidth=2))
+                                   1, 1, fill=False, edgecolor=color, linewidth=2))
 
 
 def draw_heatmap(ax, panel, azimuths, elevations):
@@ -129,7 +131,7 @@ def draw_heatmap(ax, panel, azimuths, elevations):
                             bbox={"facecolor": "white", "alpha": 0.8, "edgecolor": "none", "pad": 0.4}
                             if category_codes else None)
     _axes(ax, azimuths, elevations, panel.title)
-    _outline(ax, panel.marks, azimuths, elevations)
+    _outline(ax, panel.marks, azimuths, elevations, panel.mark_color)
     plt.colorbar(image, ax=ax, shrink=0.8, label=panel.label)
 
 
@@ -138,7 +140,7 @@ def draw_images(ax, panel, azimuths, elevations):
               extent=(-0.5, len(azimuths) - 0.5, -0.5, len(elevations) - 0.5),
               origin="upper", aspect="auto")
     _axes(ax, azimuths, elevations, panel.title)
-    _outline(ax, panel.marks, azimuths, elevations)
+    _outline(ax, panel.marks, azimuths, elevations, panel.mark_color)
 
 
 def draw_wrong_categories(ax, panel):
@@ -388,8 +390,7 @@ def _objects(rows):
     return grouped
 
 
-SELECTOR_FIGURES = {"view_relative_margin": "largest true-category margin over rivals (uses labels)",
-                    "oracle": "best SAM3D view per input (uses labels)",
+SELECTOR_FIGURES = {"oracle": "best SAM3D view per input (uses labels)",
                     "detector_entropy": "lowest SAM3 score entropy per input",
                     "detector_gap": "largest SAM3 top-1 minus top-2 gap per input"}
 

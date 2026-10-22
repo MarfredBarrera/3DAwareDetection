@@ -66,15 +66,8 @@ class SAM3D:
         self._inference.get_hfer(calculate_hfer_robust(str(mask_path)))
         return image, mask
 
-    def stage1_uncertainty(self, rgb, mask, seed=42, t_stars=(0.2, 0.5, 0.8), probes=8,
-                           samples=8, ensemble=8, guided=False):
-        """Tweedie and seed-ensemble uncertainty of stage 1 (see reconstruction.stage1_uncertainty).
-
-        Runs stage 1 only, with ``seed`` (the reconstruction's own sample), then
-        ``ensemble - 1`` more seeds. Returns ``{"ensemble": ..., "tweedie": {t: ...}}``
-        with occupancy summaries and layout-token variances.
-        """
-        import torch
+    def _record_stage1(self, rgb, mask, seed):
+        """Run stage 1 only with ``seed``; returns the recorder and its models."""
         from reconstruction import stage1_uncertainty as stage1
 
         image, mask = self._load_input(rgb, mask)
@@ -82,48 +75,128 @@ class SAM3D:
         generator, decoder = pipeline.models["ss_generator"], pipeline.models["ss_decoder"]
         if not stage1.is_data_at_one(generator):
             raise RuntimeError("stage-1 time convention differs from t = 1 at data")
-        dtype = pipeline.shape_model_dtype
         recorder = stage1.Recorder(generator)
         with recorder.attached():
             pipeline.run(self._inference.merge_mask_to_rgba(np.asarray(image), mask), None, seed,
                          stage1_only=True, with_mesh_postprocess=False, with_texture_baking=False,
                          with_layout_postprocess=True, use_vertex_color=True,
                          stage1_inference_steps=None, pointmap=None)
-            draws = [recorder.resample(seed + 1000 * k, dtype) for k in range(1, ensemble)]
         if recorder.call is None:
             raise RuntimeError("stage 1 did not call the generator")
-        reruns = [recorder.output] + draws  # the reconstruction's own sample first
-        shapes = torch.cat([draw[stage1.SHAPE] for draw in reruns])
-        layout = {key: torch.cat([draw[key] for draw in reruns]).float().var(dim=0)
-                  for key in reruns[0] if key != stage1.SHAPE}
-        result = {"ensemble": {**stage1.summarize(stage1.occupancy(decoder, shapes, dtype)),
-                               "layout_variance": stage1.pose_variance(layout)},
-                  "tweedie": {}}
-        for t_star in t_stars:
-            t, _, variance, occupied = stage1.tweedie(recorder, generator.reverse_fn, decoder,
-                                                      t_star, probes, samples, dtype, seed, guided)
-            result["tweedie"][t_star] = {
-                **stage1.summarize(occupied), "t": t,
-                "shape_variance": float(variance[stage1.SHAPE].mean()),
-                "layout_variance": stage1.pose_variance(variance)}
+        return recorder, generator, decoder, pipeline.shape_model_dtype
+
+    def stage1_ensemble(self, rgb, mask, seed=42, ensemble=3):
+        """Seed-ensemble uncertainty of stage 1 alone (see reconstruction.stage1_uncertainty):
+        ``seed`` (the reconstruction's own sample) plus ``ensemble - 1`` more seeds."""
+        from reconstruction import stage1_uncertainty as stage1
+
+        recorder, _, decoder, dtype = self._record_stage1(rgb, mask, seed)
+        return stage1.ensemble(recorder, decoder, dtype, seed, ensemble)
+
+    def stage1_fisher(self, rgb, mask, times, seed=42):
+        """Summed squared shape-head NLL gradients (unit noise) at ``times``, plus residual sums."""
+        from reconstruction import stage1_uncertainty as stage1
+
+        recorder, generator, _, dtype = self._record_stage1(rgb, mask, seed)
+        weight, bias, squared, elements = stage1.fisher_terms(
+            recorder, generator.reverse_fn, stage1.shape_head(generator), times, dtype, seed)
+        return {"weight": weight.cpu(), "bias": bias.cpu(), "squared": squared, "elements": elements}
+
+    def stage1_prior(self, rgb, mask, seeds=(42,)):
+        """Stage-1 occupancy (B, 64, 64, 64) with the image removed: SAM3D's unconditional
+        shape prior, one sample per seed, from the same noise as the conditioned run."""
+        import torch
+        from functools import partial
+        from reconstruction import stage1_uncertainty as stage1
+
+        recorder, generator, decoder, dtype = self._record_stage1(rgb, mask, seeds[0])
+        reverse_fn, backbone = generator.reverse_fn, generator.reverse_fn.backbone
+        saved = (reverse_fn.strength, getattr(reverse_fn, "strength_pm", None))
+        reverse_fn.strength = 0.0  # one (now unconditional) branch per step, no guidance
+        if saved[1] is not None:
+            reverse_fn.strength_pm = 0.0
+        backbone.forward = partial(type(backbone).forward, backbone, cfg=True)  # condition zeroed
+        try:
+            draws = [recorder.resample(seed, dtype)[stage1.SHAPE] for seed in seeds]
+        finally:
+            del backbone.forward
+            reverse_fn.strength = saved[0]
+            if saved[1] is not None:
+                reverse_fn.strength_pm = saved[1]
+        return stage1.occupancy(decoder, torch.cat(draws), dtype)
+
+    def stage1_mean_gap(self, rgb, mask, seed=42):
+        """The reconstruction's stage-1 shape (``seed``) vs the one-step mean shapes (guided,
+        unguided, and the image-free prior): latent gaps (mean squared difference per dimension),
+        occupancies, and the seconds each pass adds (one network pass and one decode)."""
+        import time
+        import torch
+        from reconstruction import stage1_uncertainty as stage1
+
+        recorder, generator, decoder, dtype = self._record_stage1(rgb, mask, seed)
+        sample = recorder.output[stage1.SHAPE].float()
+        result = {"sample": stage1.occupancy(decoder, sample, dtype)[0]}
+        for name in ("guided", "unguided", "prior"):
+            torch.cuda.synchronize()
+            started = time.perf_counter()
+            mean = stage1.mean_prediction(recorder, generator.reverse_fn, dtype, name)[stage1.SHAPE]
+            result[f"mean_{name}"] = stage1.occupancy(decoder, mean, dtype)[0]
+            torch.cuda.synchronize()
+            result[f"seconds_{name}"] = time.perf_counter() - started
+            result[f"latent_gap_{name}"] = float(((sample - mean) ** 2).mean())
         return result
+
+    def stage1_information(self, rgb, mask, seed=42, samples=32):
+        """Pointwise mutual information between the input and the stage-1 shape (nats)."""
+        from reconstruction import stage1_uncertainty as stage1
+
+        recorder, generator, _, dtype = self._record_stage1(rgb, mask, seed)
+        return stage1.information(recorder, generator.reverse_fn, samples, dtype, seed)
+
+    def stage1_laplace(self, rgb, mask, std, seed=42, samples=4, noise=1e-3):
+        """Last-layer Laplace generative uncertainty of stage 1 (arXiv:2502.20946).
+
+        Same noise ``seed`` for every draw; ``samples`` shape-head weight sets
+        from N(MAP, diag ``std``^2). Returns the occupancy summary of the draws
+        plus ``entropy`` (nats per shape-latent dimension, sigma^2 = ``noise``).
+        """
+        import torch
+        from reconstruction import stage1_uncertainty as stage1
+
+        recorder, generator, decoder, dtype = self._record_stage1(rgb, mask, seed)
+        head = stage1.shape_head(generator)
+        weights = torch.Generator(device=head.weight.device).manual_seed(seed)
+        draws = []
+        for _ in range(samples):
+            with stage1.perturbed(head, std, weights):
+                draws.append(recorder.resample(seed, dtype)[stage1.SHAPE])
+        shapes = torch.cat(draws)
+        return {**stage1.summarize(stage1.occupancy(decoder, shapes, dtype)),
+                "entropy": stage1.latent_entropy(shapes.float().cpu().numpy(), noise)}
 
     def render_views(self, rgb, mask, output_dir, views=8, resolution=512, seed=42, pointmap=None,
                      view_grid=None, save_ply=True, view_distance=1.0, also_turntable=False,
-                     input_elevation=None, save_gaussians=False):
+                     input_elevation=None, ensemble=1):
         """Write either a turntable or a viewpoint grid from one RGB and mask.
 
         Grid renders include ``mesh.npz`` for ambiguity scoring. The one-frame
         demo also writes a PLY for its interactive viewer. With the input
-        camera's ``input_elevation`` (degrees), grid cameras keep gravity up so
-        candidates are level; without it they keep the input camera's up.
-        ``save_gaussians`` writes ``gaussians.npz`` (see ``save_gaussians``).
+        camera's ``input_elevation`` (degrees, required for grids), grid cameras
+        keep gravity up so candidates are level. (Keeping the input camera's up
+        rolled every off-axis candidate of an elevated input; fixed 2026-10-18.)
 
         ``last_timing["model_seconds"]`` covers SAM3D inference and Gaussian
         preparation. It excludes input loading, mesh output, and view rendering.
+
+        ``ensemble > 1`` also writes ``stage1.npz``: the seed ensemble of stage 1,
+        with this run as its first member and ``ensemble - 1`` reruns of its
+        recorded stage-1 call (``ensemble_seconds``), so no second pass over the input.
         """
+        from contextlib import nullcontext
         from time import perf_counter
 
+        if view_grid is not None and input_elevation is None:
+            raise ValueError("view_grid needs input_elevation; without it candidates are rolled")
         image, mask = self._load_input(rgb, mask)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -135,19 +208,30 @@ class SAM3D:
 
         # CUDA work is asynchronous. Synchronizing on either side gives an
         # accurate wall-clock duration for the model portion only.
+        from reconstruction import stage1_uncertainty as stage1
+        pipeline = self._inference._pipeline
+        recorder = stage1.Recorder(pipeline.models["ss_generator"])
         _synchronize_cuda()
         model_started = perf_counter()
-        output = self._inference(np.asarray(image), mask, seed=seed, pointmap=pointmap)
+        with recorder.attached() if ensemble > 1 else nullcontext():
+            output = self._inference(np.asarray(image), mask, seed=seed, pointmap=pointmap)
         scene = self._make_scene(output)
         gaussian = self._prepare_gaussian(scene)
         _synchronize_cuda()
         model_seconds = perf_counter() - model_started
 
+        ensemble_started = perf_counter()
+        if ensemble > 1:
+            if recorder.call is None:
+                raise RuntimeError("stage 1 did not call the generator")
+            summary = stage1.ensemble(recorder, pipeline.models["ss_decoder"],
+                                      pipeline.shape_model_dtype, seed, ensemble)
+            stage1.save_ensemble(output_dir / "stage1.npz", summary, ensemble)
+        ensemble_seconds = perf_counter() - ensemble_started
+
         mesh_started = perf_counter()
         if save_ply:
             gaussian.save_ply(str(output_dir / "object.ply"))
-        if save_gaussians:
-            save_gaussian_npz(gaussian, output_dir / "gaussians.npz")
         if view_grid is not None:
             if "mesh" not in output:
                 raise RuntimeError("SAM3D returned no mesh for viewpoint scoring")
@@ -155,15 +239,16 @@ class SAM3D:
         mesh_write_seconds = perf_counter() - mesh_started
 
         render_started = perf_counter()
-        up = None if input_elevation is None else sam3d_gravity(input_elevation)
         frames = (render_view_grid(gaussian, render_view, output_dir / "views",
-                                   *view_grid, resolution=resolution, distance=view_distance, up=up)
+                                   *view_grid, resolution=resolution, distance=view_distance,
+                                   up=sam3d_gravity(input_elevation))
                   if view_grid is not None else
                   render_turntable(gaussian, self._render_video, output_dir, views, resolution))
         if view_grid is not None and also_turntable:
             render_turntable(gaussian, self._render_video, output_dir, views, resolution)
         self.last_timing = {
             "model_seconds": model_seconds,
+            "ensemble_seconds": ensemble_seconds,
             "mesh_write_seconds": mesh_write_seconds,
             ("view_grid_seconds" if view_grid is not None else "turntable_seconds"):
                 perf_counter() - render_started,
@@ -181,21 +266,6 @@ def _pointmap(pointmap, image_size):
     if not np.isfinite(pointmap).all():
         raise ValueError("pointmap must contain only finite coordinates")
     return pointmap
-
-
-def save_gaussian_npz(gaussian, path):
-    """Activated Gaussians in the candidate render frame, as gsplat takes them.
-
-    Arrays: ``means`` (N, 3), ``scales`` (N, 3), ``quats`` (N, 4, wxyz, unit),
-    ``opacities`` (N,), and ``sh`` (N, K, 3) spherical-harmonic coefficients.
-    """
-    def array(tensor):
-        return tensor.detach().float().cpu().numpy()
-
-    np.savez_compressed(path, means=array(gaussian.get_xyz), scales=array(gaussian.get_scaling),
-                        quats=array(gaussian.get_rotation),
-                        opacities=array(gaussian.get_opacity).reshape(-1),
-                        sh=array(gaussian.get_features), sh_degree=gaussian.active_sh_degree)
 
 
 def _save_render_mesh(output, scene_gaussian, output_dir, save_ply=True):
@@ -263,11 +333,12 @@ def render_turntable(gaussian, render_video, output_dir, views=8, resolution=512
     return frames
 
 
-def render_view(gaussian, resolution, bg_color, r, fov, pitch_deg, yaw_start_deg, up=None):
+def render_view(gaussian, resolution, bg_color, r, fov, pitch_deg, yaw_start_deg, up):
     """One frame of ``notebook/inference.render_video``, with a choosable camera up.
 
-    That renderer always uses the frame's +Y as up; ``up`` (None = +Y) replaces it.
-    Cameras whose view direction is parallel to ``up`` fall back to +Y.
+    That renderer always uses the frame's +Y (the input camera's up) as up; ``up``
+    replaces it, normally ``tools.cameras.sam3d_gravity``. Cameras whose view
+    direction is parallel to ``up`` fall back to +Y.
     """
     import math
 
@@ -278,7 +349,7 @@ def render_view(gaussian, resolution, bg_color, r, fov, pitch_deg, yaw_start_deg
     yaw, pitch = math.radians(yaw_start_deg), math.radians(pitch_deg)
     origin = r * np.array([math.sin(yaw) * math.cos(pitch), math.sin(pitch),
                            math.cos(yaw) * math.cos(pitch)])
-    up = np.array([0.0, 1.0, 0.0]) if up is None else np.asarray(up, dtype=np.float64)
+    up = np.asarray(up, dtype=np.float64)
     if np.linalg.norm(np.cross(origin / r, up)) < 1e-6:
         up = np.array([0.0, 1.0, 0.0])
     extrinsics = utils3d.torch.extrinsics_look_at(
@@ -292,12 +363,13 @@ def render_view(gaussian, resolution, bg_color, r, fov, pitch_deg, yaw_start_deg
 
 
 def render_view_grid(gaussian, render_view, output_dir, azimuths, elevations, resolution=512,
-                     distance=1.0, up=None):
+                     distance=1.0, *, up):
     """Render one image at each local azimuth/elevation pair, elevation-major.
 
     The camera orbits the normalized reconstruction (largest extent 1) at ``distance``
     with a 60-degree FOV; below about 1.6 the object is clipped by the frame.
-    ``up`` is the camera up vector in that frame (None = +Y, the input camera's up).
+    ``up`` is the camera up vector in that frame: ``tools.cameras.sam3d_gravity``
+    of the input elevation keeps candidates level.
     """
     if resolution < 64:
         raise ValueError("resolution must be at least 64")

@@ -41,5 +41,5 @@ ambiguity:
 analysis:
   primary_selector: ambiguity:combined
   figure_selectors: [identity, ambiguity:combined, detector_entropy,
-                     detector_gap, view_relative_margin, oracle]
+                     detector_gap, oracle]
   combined_weights: null

@@ -1,0 +1,50 @@
+# Calibration set for the SAM3D reconstruction-uncertainty abstention threshold:
+# all 1,800 ViewActive blender_full objects (66 LVIS categories, all splits),
+# one hash-chosen input view each. The reconstruct stage writes the 3-seed stage-1
+# ensemble (stage1.npz); the existing 1,798 reconstructions have a 4-seed one
+# from scripts.reconstruction_uncertainty stage1.
+output_dir: ../outputs/lvis_uncertainty
+gpu_id: 0
+
+dataset:
+  root: ../outputs/viewactive/blender_full/store
+  canonical: ../outputs/viewactive/blender_full/canonical.json
+  manifest: ../outputs/viewactive/blender_full/objects.json
+  split: [train, val, test, test_unseen]
+  source_run: ../outputs/viewactive/blender_full
+  views_per_object: 1
+  require_upright_verified: false
+  categories: [airplane, army_tank, balloon, banana, bench, bicycle, bookcase, boot,
+               bowl, butterfly, car_(automobile), cat, chair, computer_keyboard,
+               crab_(animal), crate, dog, dresser, drum_(musical_instrument), elephant,
+               fan, fighter_jet, frog, guitar, helmet, horse, jeep, lampshade, lion,
+               manhole, mask, monitor_(computer_equipment) computer_monitor, mug,
+               mushroom, necklace, owl, penguin, piano, pickup_truck, pistol, pizza,
+               pumpkin, rabbit, race_car, radio_receiver, rifle, shark, shield, shoe,
+               soccer_ball, spider, sunglasses, table, table_lamp, teddy_bear,
+               telephone, television_set, toilet, traffic_light, turtle, vase,
+               vending_machine, violin, water_bottle, wineglass, wolf]
+  objects_per_category: 1000  # every cohort object
+  azimuths: [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
+  elevations: [0, 15, 30, 45, 60]
+  distance: 1.4
+  image_size: 1920  # Blender source width; source metadata stores 1920x1680.
+
+reconstruction:
+  objects_per_category: 1000
+  input_elevations: null
+  candidate_azimuths: [0, 45, 90, 135, 180, 225, 270, 315]
+  candidate_elevations: [0, 30, 60]
+  candidate_distance: 2.0
+  resolution: 320
+  seed: 42
+  ensemble: 3
+
+# The label view: the SAM3D candidate nearest the object's ground-truth VQF
+# maximum within elevations 0-45 (plus identity and one random candidate as
+# controls). SAM3 runs on the inputs and these picks only.
+picks:
+  vqf: ../outputs/viewactive/blender_full_el0_45/vqf.npz
+  elevation_range: [0, 45]
+  seed: 0
+  detect_only: true

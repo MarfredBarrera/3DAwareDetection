@@ -26,7 +26,11 @@ reusable plots, and all images, angles, and scores stored in the study database.
   angles are in the reviewed object frame; SAM3D candidate angles are relative
   to the input camera, and (180, 0) re-renders the input view (verified visually).
   SAM3D candidate cameras use gravity as up (`tools.cameras.sam3d_gravity`, from
-  the input elevation); studies reconstructed before 2026-10-18 were rolled.
+  the input elevation). Before 2026-10-18 they kept the input camera's up, so
+  off-axis candidates of elevated inputs were rolled. That bug is closed:
+  candidate grids require the input elevation, and the reconstruct fingerprint
+  includes "gravity-up", so a rolled study refuses to resume. Rolled results
+  exist only in the NAS archive `upright-rolled-sam3d-2026-10-18.tar`.
 - **Controls** for any after-result: `identity` (re-render from the input view),
   `random`, and `oracle`. An ambiguity selector only counts if it beats
   `identity` and `random`.
@@ -50,6 +54,7 @@ reusable plots, and all images, angles, and scores stored in the study database.
 - Shared GPU server: check `nvidia-smi` and set `gpu_id` to an idle GPU before
   every GPU run.
 - Tests: `sam3d-env core python -m unittest discover -s tests`, plus
-  `test_ambiguity.py` and `test_harness.py` in the `sam3d` env.
+  `test_ambiguity.py`, `test_harness.py` and
+  `test_stage1_uncertainty.py` in the `sam3d` env.
 - Keep config validation in `study/config.py`; don't add new YAML entry points
   outside `configs/`.

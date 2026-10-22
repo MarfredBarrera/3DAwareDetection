@@ -17,8 +17,6 @@ GPU work.
   a distribution over the vocabulary, have the lowest entropy. Label-free.
 - ``detector_gap``: the candidate with the largest gap between SAM3's top two
   category scores. Label-free; equals the oracle margin when top-1 is correct.
-- ``view_relative_margin``: the largest true-category score minus the strongest
-  rival. Uses labels and is equivalent to ``oracle`` on this full vocabulary.
 - ``oracle``: the candidate with the best SAM3 margin (an upper bound; uses labels).
 
 Ground-truth-view selectors pick another *ground-truth* view of the input's
@@ -32,19 +30,64 @@ ground-truth views):
 - ``gt_random``: a uniformly random ground-truth view in the elevation range.
 - ``gt_oracle``: the ground-truth view in the elevation range with the best
   SAM3 margin (uses labels).
+
+Pick selectors run before detection (``picks`` config, ``pick`` stage), so SAM3
+can be run on the chosen candidates only:
+
+- ``gt_vqf_max``: the SAM3D candidate nearest in angle to the maximum of the
+  object's ground-truth VQF (equal-mean channels) within ``elevation_range``.
+  Candidate angles are mapped to the object frame with the input's known pose
+  (``viewactive.grid.sam3d_absolute``).
+- ``identity`` and ``random`` (one seeded candidate) as controls.
 """
 import numpy as np
 
 from tools.cameras import SAM3D_INPUT_VIEW
 
 GT_SELECTORS = ("gt_vqf", "gt_random", "gt_oracle")
+PICK_SELECTORS = ("gt_vqf_max", "identity", "random")
+
+
+def picks(source, candidates, field, grid, limits, seed):
+    """{selector: (candidate image_id, meta)} for one input before detection.
+
+    ``source`` and ``candidates`` are image rows; ``field`` is the object's
+    combined ground-truth VQF ``[E, A]`` on ``grid`` (None skips ``gt_vqf_max``).
+    """
+    from tools.cameras import direction
+    from viewactive.grid import elevation_rows, sam3d_absolute
+
+    if not candidates:
+        return {}
+    chosen = {}
+    rng = np.random.default_rng([seed, source["image_id"]])
+    pick = candidates[int(rng.integers(len(candidates)))]
+    chosen["random"] = (pick["image_id"], {})
+    identity = [c for c in candidates if (c["azimuth"], c["elevation"]) == SAM3D_INPUT_VIEW]
+    if identity:
+        chosen["identity"] = (identity[0]["image_id"], {})
+    if field is not None:
+        allowed = elevation_rows(grid, limits)[:, None] & np.isfinite(field)
+        if allowed.any():
+            e, a = map(int, np.unravel_index(np.argmax(np.where(allowed, field, -np.inf)), field.shape))
+            target = (grid.azimuths[a], grid.elevations[e])
+            goal = direction(*target)
+            angles = [sam3d_absolute(c["azimuth"], c["elevation"], source["azimuth"], source["elevation"])
+                      for c in candidates]
+            errors = [float(np.degrees(np.arccos(np.clip(direction(*angle) @ goal, -1, 1))))
+                      for angle in angles]
+            best = int(np.argmin(errors))
+            chosen["gt_vqf_max"] = (candidates[best]["image_id"], {
+                "target": list(target), "target_vqf": float(field[e, a]),
+                "absolute": [float(v) for v in angles[best]], "error_deg": errors[best]})
+    return chosen
 
 
 def selector_names(metrics):
     names = ["identity", "random", *(f"ambiguity:{name}" for name in metrics)]
     if len(metrics) > 1:
         names.append("ambiguity:combined")
-    return names + ["detector_entropy", "detector_gap", "view_relative_margin", "oracle"]
+    return names + ["detector_entropy", "detector_gap", "oracle"]
 
 
 def detector_entropy(prompt_scores):
@@ -103,7 +146,7 @@ def weights(name, candidate_ids, scores, margins, metrics, angles, prompt_scores
         return None
     if name == "random":
         return {i: 1 / len(ids) for i in ids}
-    if name in ("oracle", "view_relative_margin"):
+    if name == "oracle":
         return _pick(ids, [margins[i] for i in ids], best=max)
     if name == "detector_entropy":
         return _pick(ids, [detector_entropy(prompt_scores[i]) for i in ids])
