@@ -61,6 +61,17 @@ class Verdict:
     views: list = field(default_factory=list)  # every candidate considered
     timing: dict = None
 
+    def summary(self):
+        """JSON-safe dict of the verdict; views without their images."""
+        def view(v):
+            return {"azimuth": v.azimuth, "elevation": v.elevation, "quality": v.quality,
+                    "vqf_elevation": v.vqf_elevation, "scores": v.scores}
+
+        return {"accepted": self.accepted, "label": self.label, "scores": dict(self.scores),
+                "judged": self.judged, "view": None if self.view is None else view(self.view),
+                "uncertainty": self.uncertainty, "trusted": self.trusted,
+                "views": [view(v) for v in self.views], "timing": self.timing}
+
 
 def default_launcher():
     if shutil.which("sam3d-env"):

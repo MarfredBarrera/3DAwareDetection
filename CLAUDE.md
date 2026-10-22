@@ -49,7 +49,10 @@ reusable plots, and all images, angles, and scores stored in the study database.
 
 - `perception/` is the runtime pipeline (two persistent model workers, one per
   env); `python -m perception` verifies one frame. `scripts/apexnav_fp.py`
-  evaluates it on ApexNav's false-positive episodes.
+  evaluates it on ApexNav's false-positive episodes. `python -m perception.server`
+  serves one `Verifier` over HTTP (port 8770) to ApexNav's `perception_gate`
+  package (ApexNav branch `perception-gate`; plan in
+  `docs/apexnav_integration_plan.md`).
 - `python -m study --config configs/<name>.yaml` runs render -> reconstruct ->
   score -> pick -> detect -> analyze. Stages resume. Outputs are in `outputs/<study>/`,
   with `study.sqlite` as the source of truth. See README.md. `outputs/` and

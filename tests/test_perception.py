@@ -1,5 +1,10 @@
-"""perception.Verifier decisions with fake model workers, and the ensemble disagreement (CPU)."""
+"""perception.Verifier decisions with fake model workers, its HTTP server, and the ensemble
+disagreement (CPU)."""
+import json
+import threading
 import unittest
+import urllib.error
+import urllib.request
 from unittest.mock import patch
 
 import numpy as np
@@ -91,6 +96,77 @@ class VerifierTests(unittest.TestCase):
         for bad in ({"selector": "nope"}, {"on_uncertain": "nope"}, {"ensemble_seeds": 1}):
             with self.assertRaises(ValueError):
                 self.verifier(**bad)
+
+
+class ServerTests(unittest.TestCase):
+    """perception.server round trips against a Verifier with fake workers."""
+
+    def setUp(self):
+        from perception import server
+
+        self.server_module = server
+        FakeWorker.uncertainty = 0.05
+        with patch("perception.client._Worker", FakeWorker):
+            self.verifier = client.Verifier(selector="top2gap", vocabulary=["chair", "table"],
+                                            azimuths=(0, 90, 180), elevations=(0,))
+        self.server = server.VerifierServer(self.verifier, {"selector": "top2gap"}, port=0)
+        self.server.log = lambda record: None
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+    def call(self, path, payload=None):
+        data = None if payload is None else json.dumps(payload).encode()
+        try:
+            with urllib.request.urlopen(urllib.request.Request(self.url + path, data=data), timeout=10) as reply:
+                return reply.status, json.loads(reply.read())
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read())
+
+    def request(self, **fields):
+        return {"protocol": self.server_module.PROTOCOL, "request_id": "r1", "image": encode(IMAGE),
+                "mask": encode(MASK, "L"), "target": "table", "input_elevation": 10.0, **fields}
+
+    def test_health(self):
+        status, reply = self.call("/health")
+        self.assertEqual((status, reply["ok"], reply["protocol"], reply["settings"]),
+                         (200, True, self.server_module.PROTOCOL, {"selector": "top2gap"}))
+
+    def test_verify_round_trip(self):
+        status, reply = self.call("/verify", self.request())
+        self.assertEqual((status, reply["ok"]), (200, True))
+        verdict = reply["verdict"]
+        self.assertEqual((verdict["accepted"], verdict["label"], verdict["judged"]), (True, "table", "view"))
+        self.assertEqual((verdict["view"]["azimuth"], len(verdict["views"])), (0.0, 3))
+        self.assertIsNotNone(reply["view_image"])
+        status, reply = self.call("/verify", self.request(target="chair"))
+        self.assertEqual((status, reply["verdict"]["accepted"], reply["verdict"]["label"]), (200, False, "table"))
+
+    def test_bad_requests(self):
+        status, reply = self.call("/verify", self.request(mask=None))
+        self.assertEqual((status, reply["ok"]), (400, False))
+        self.assertIn("mask", reply["error"])
+        status, reply = self.call("/verify", self.request(protocol=0))
+        self.assertEqual((status, reply["ok"]), (400, False))
+        self.assertIn("protocol", reply["error"])
+        self.assertEqual(self.call("/nope")[0], 404)
+
+    def test_worker_error(self):
+        with patch.object(FakeWorker, "call", side_effect=RuntimeError("worker died")), \
+                patch("traceback.print_exc"):
+            status, reply = self.call("/verify", self.request())
+        self.assertEqual((status, reply["ok"]), (500, False))
+        self.assertIn("worker died", reply["error"])
+
+    def test_summary_is_json_safe(self):
+        verdict = self.verifier.verify(IMAGE, MASK, "table")
+        summary = json.loads(json.dumps(verdict.summary()))
+        self.assertEqual(summary["view"], {"azimuth": 0.0, "elevation": 0.0, "quality": None,
+                                           "vqf_elevation": None, "scores": {"chair": 0.1, "table": 0.9}})
+        self.assertNotIn("image", summary["views"][0])
 
 
 class DisagreementTests(unittest.TestCase):

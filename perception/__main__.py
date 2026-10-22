@@ -9,7 +9,6 @@ Writes input.png, mask.png, the rendered candidates and verdict.json to ``--out`
 """
 import argparse
 import json
-from dataclasses import asdict
 from pathlib import Path
 
 from perception import select
@@ -48,7 +47,7 @@ def main():
     from perception.images import to_pil
     to_pil(args.image).save(args.out / "input.png")
     to_pil(mask, "L").save(args.out / "mask.png")
-    record = asdict(verdict)
+    record = verdict.summary()
     for view, data in zip(verdict.views, record["views"]):
         data["image"] = None
         if view.image is not None:
