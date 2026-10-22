@@ -106,6 +106,9 @@ class _Worker:
             self.process.stdin.write(json.dumps({"op": op, "args": args}) + "\n")
             return self._read()
 
+    def alive(self):
+        return self.process.poll() is None
+
     def close(self):
         if self.process.poll() is None:
             self.process.stdin.close()
@@ -235,6 +238,10 @@ class Verifier:
         verdict.label = select.top1(verdict.scores)[0]
         verdict.accepted = verdict.label == target
         return verdict
+
+    def alive(self):
+        """{worker: True while its process runs}."""
+        return {"sam3": self.sam3.alive(), "sam3d": self.sam3d.alive()}
 
     def close(self):
         for worker in (getattr(self, "sam3", None), getattr(self, "sam3d", None)):

@@ -16,6 +16,11 @@
    optional ensemble filter -> `vqf` or `top2gap` view -> SAM3. Keep it a
    single, simple API that a planner can call; evaluation code reuses
    `perception.select` rather than reimplementing the rules.
+   **Current goal: integrate it into ApexNav** (`~/codes/ApexNav`; datasets in `/ICONAS/users/marfred/apexnav_data`, replays and image tar in `/ICONAS/users/marfred/ApexNav`).
+   Whenever the ApexNav agent believes it has detected the target object, the
+   detection must first pass `perception.Verifier`; if it fails, it is treated
+   as a non-detection and the agent keeps exploring. This needs ApexNav's
+   ROS2/Habitat env and our `core`/`sam3d` envs to talk to each other.
 
 Everything in the repo should serve these goals. Remove outdated code and data
 rather than keeping parallel versions. Changes should make experimenting easy:

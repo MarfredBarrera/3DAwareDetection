@@ -8,7 +8,8 @@
 
 One ``Verifier`` with fixed settings per run; requests are served one at a time.
 
-- ``GET /health`` -> ``{ok, protocol, settings}``.
+- ``GET /health`` -> ``{ok, protocol, settings, workers}``; ``ok`` is false (status 503)
+  once a model worker has died, and the server then exits with status 1.
 - ``POST /verify`` with ``{protocol, request_id, image, mask, target, input_elevation,
   vocabulary?}`` (images base64 PNG/JPEG, mask nonzero on the object) ->
   ``{ok, verdict, view_image}``: ``Verdict.summary()`` and the judged SAM3D view as
@@ -21,6 +22,7 @@ import argparse
 import base64
 import json
 import sys
+import threading
 import time
 import traceback
 import urllib.error
@@ -68,7 +70,10 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path != "/health":
             return self._reply(404, {"ok": False, "error": f"unknown path {self.path}"})
-        self._reply(200, {"ok": True, "protocol": PROTOCOL, "settings": self.server.settings})
+        workers = self.server.verifier.alive()
+        ok = all(workers.values())
+        self._reply(200 if ok else 503, {"ok": ok, "protocol": PROTOCOL, "settings": self.server.settings,
+                                         "workers": workers})
 
     def do_POST(self):
         if self.path != "/verify":
@@ -115,6 +120,20 @@ class VerifierServer(HTTPServer):
         self.verifier, self.settings = verifier, settings
         self.requests = Path(log_dir) / "requests.jsonl" if log_dir else None
 
+    def watch_workers(self, period=5.0):
+        """Stop serving when a model worker dies (a dead worker fails every request)."""
+        def watch():
+            while not self.stopped.wait(period):
+                workers = self.verifier.alive()
+                if not all(workers.values()):
+                    print(f"perception worker died: {workers}; stopping", flush=True)
+                    self.worker_died = True
+                    self.shutdown()
+                    return
+
+        self.stopped, self.worker_died = threading.Event(), False
+        threading.Thread(target=watch, daemon=True).start()
+
     def log(self, record):
         print(json.dumps(record), flush=True)
         if self.requests:
@@ -159,12 +178,16 @@ def serve(argv):
                   log_dir=args.log_dir) as verifier:
         server = VerifierServer(verifier, settings, args.host, args.port, args.log_dir)
         print(f"perception server on http://{args.host}:{server.server_port} {json.dumps(settings)}", flush=True)
+        server.watch_workers()
         try:
             server.serve_forever()
         except KeyboardInterrupt:
             pass
         finally:
+            server.stopped.set()
             server.server_close()
+    if server.worker_died:
+        sys.exit(1)
 
 
 def ping(argv):

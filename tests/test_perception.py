@@ -32,6 +32,9 @@ class FakeWorker:
     def wait_ready(self):
         pass
 
+    def alive(self):
+        return self.role != "dead"
+
     def close(self):
         pass
 
@@ -144,6 +147,18 @@ class ServerTests(unittest.TestCase):
         self.assertIsNotNone(reply["view_image"])
         status, reply = self.call("/verify", self.request(target="chair"))
         self.assertEqual((status, reply["verdict"]["accepted"], reply["verdict"]["label"]), (200, False, "table"))
+
+    def test_dead_worker(self):
+        self.verifier.sam3d.role = "dead"
+        status, reply = self.call("/health")
+        self.assertEqual((status, reply["ok"], reply["workers"]), (503, False, {"sam3": True, "sam3d": False}))
+        self.server.watch_workers(period=0.01)
+        self.server.stopped.wait(0.5)
+        for _ in range(100):
+            if self.server.worker_died:
+                break
+            self.server.stopped.wait(0.02)
+        self.assertTrue(self.server.worker_died)
 
     def test_bad_requests(self):
         status, reply = self.call("/verify", self.request(mask=None))

@@ -92,7 +92,8 @@ sam3d-env core python -m perception.server verify http://localhost:8770 \
     --image frame.jpg --mask mask.png --target tv --elevation 30
 ```
 
-- `GET /health` returns `{ok, protocol, settings}`; `POST /verify` takes
+- `GET /health` returns `{ok, protocol, settings, workers}` (503 once a model worker
+  died; the server then exits with status 1); `POST /verify` takes
   `{protocol, request_id, image, mask, target, input_elevation, vocabulary?}`
   (base64 images) and returns `{ok, verdict, view_image}`, where `verdict` is
   `Verdict.summary()`. Malformed requests get a 400, verifier failures a 500,
