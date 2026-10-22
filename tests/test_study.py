@@ -54,24 +54,20 @@ class LabelTests(unittest.TestCase):
                                          VOCABULARY, DETECTION))
 
 
-class PickTests(unittest.TestCase):
-    def test_gt_vqf_max_takes_the_candidate_nearest_the_constrained_maximum(self):
-        from viewactive.grid import Grid
-        grid = Grid((0.0, 90.0, 180.0, 270.0), (0.0, 45.0, 90.0))
-        field = np.zeros(grid.shape)
-        field[2, 0] = 1.0  # global maximum above the band
-        field[0, 1] = 0.5  # best view within elevations 0-45: azimuth 90, elevation 0
-        source = {"image_id": 7, "azimuth": 0.0, "elevation": 0.0}
-        # With a level input, candidate azimuth 180 is the input view (absolute 0),
-        # so absolute azimuth 90 is candidate azimuth 270.
-        candidates = [{"image_id": i, "azimuth": a, "elevation": 0.0}
-                      for i, a in enumerate((0.0, 90.0, 180.0, 270.0))]
-        picked = selectors.picks(source, candidates, field, grid, [0, 45], seed=0)
-        self.assertEqual(picked["gt_vqf_max"][0], 3)
-        self.assertAlmostEqual(picked["gt_vqf_max"][1]["error_deg"], 0.0, places=4)
-        self.assertEqual(picked["identity"][0], 2)
-        self.assertEqual(picked["random"], selectors.picks(source, candidates, None, grid, None, 0)["random"])
-        self.assertNotIn("gt_vqf_max", selectors.picks(source, candidates, None, grid, None, 0))
+class PerceptionSelectTests(unittest.TestCase):
+    def test_top2gap_vqf_and_the_ensemble_filter(self):
+        from perception import select
+
+        self.assertEqual(select.top1({"a": 0.8, "b": 0.3, "c": 0.5}), ("a", 0.30000000000000004))
+        self.assertEqual(select.top2gap_pick({1: {"a": 0.9, "b": 0.8}, 2: {"a": 0.2, "b": 0.7}}), 2)
+        quality = {1: (0.9, 60.0), 2: (0.5, 30.0), 3: (0.7, 0.0)}
+        self.assertEqual(select.vqf_pick(quality), 3)  # 1 is above the 0-45 band
+        self.assertEqual(select.vqf_pick(quality, (50, 90)), 1)
+        self.assertEqual(select.vqf_pick({1: (0.2, 80.0), 2: (0.4, 70.0)}), 2)  # none in band: all compete
+        self.assertTrue(select.trusted(0.1, 0.15))
+        self.assertFalse(select.trusted(0.2, 0.15))
+        self.assertFalse(select.trusted(None, 0.15))
+        self.assertTrue(select.trusted(None, None))
 
 
 class SelectorTests(unittest.TestCase):
@@ -98,45 +94,17 @@ class SelectorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown selector"):
             self.pick("ambiguity:c")
         self.assertEqual(selectors.selector_names(["a"]),
-                         ["identity", "random", "ambiguity:a", "detector_entropy",
-                          "detector_gap", "oracle"])
+                         ["identity", "random", "ambiguity:a", "top2gap", "oracle"])
+        self.assertIn("vqf", selectors.selector_names(["a"], vqf=True))
 
-    def test_detector_entropy_prefers_a_confident_view(self):
-        self.assertAlmostEqual(selectors.detector_entropy({"a": 0.5, "b": 0.5}), 1.0)
-        self.assertAlmostEqual(selectors.detector_entropy({"a": 0.9, "b": 0.0}), 0.0)
-        self.assertIsNone(selectors.detector_entropy({"a": 0.0, "b": 0.0}))
-        prompts = {1: {"a": 0.5, "b": 0.5}, 2: {"a": 0.9, "b": 0.1}, 3: {"a": 0.0, "b": 0.0}}
-        self.assertEqual(selectors.weights("detector_entropy", [1, 2, 3], self.scores, self.margins,
-                                           ["a", "b"], self.angles, prompts), {2: 1.0})
-
-    def test_detector_gap_prefers_the_largest_top_two_gap(self):
-        self.assertAlmostEqual(selectors.detector_gap({"a": 0.8, "b": 0.3, "c": 0.5}), 0.3)
-        self.assertIsNone(selectors.detector_gap({"a": 0.8}))
+    def test_top2gap_and_stored_vqf_picks(self):
         prompts = {1: {"a": 0.9, "b": 0.8}, 2: {"a": 0.2, "b": 0.7}, 3: {"a": 0.1, "b": 0.1}}
-        self.assertEqual(selectors.weights("detector_gap", [1, 2, 3], self.scores, self.margins,
+        self.assertEqual(selectors.weights("top2gap", [1, 2, 3], self.scores, self.margins,
                                            ["a", "b"], self.angles, prompts), {2: 1.0})
-
-    def test_gt_vqf_selectors_follow_the_field_within_the_elevation_band(self):
-        from viewactive.grid import Grid
-
-        grid = Grid((0.0, 90.0, 180.0, 270.0), (0.0, 30.0, 60.0))
-        views = {(e, a): 10 * e + a for e in range(3) for a in range(4)}
-        # Visual-entropy ambiguity: lowest (best) at (60, 180), next best at (30, 90).
-        ambiguity = {i: 0.9 for i in views.values()}
-        ambiguity[22], ambiguity[11] = 0.0, 0.2
-        scores = {i: {"visual_entropy": a} for i, a in ambiguity.items()}
-        field = selectors.gt_vqf_field(views, scores, ["visual_entropy"], grid)
-        self.assertAlmostEqual(field[2, 2], 1.0)
-        margins = {i: 0.01 * i for i in views.values()}
-        settings = {"reach_cells": [1, 1], "steps": 4, "elevation_range": None}
-        pick = lambda name, settings: selectors.gt_view_weights(name, (0, 0), views, field, margins,
-                                                               grid, settings)
-        self.assertEqual(pick("gt_vqf", settings), {22: 1.0})
-        band = settings | {"elevation_range": [0, 30]}
-        self.assertEqual(pick("gt_vqf", band), {11: 1.0})
-        self.assertEqual(pick("gt_oracle", band), {13: 1.0})
-        self.assertEqual(sum(pick("gt_random", band).values()), 1.0)
-        self.assertEqual(len(pick("gt_random", band)), 8)
+        self.assertEqual(selectors.weights("vqf", [1, 2, 3], self.scores, self.margins,
+                                           ["a", "b"], self.angles, vqf_pick=3), {3: 1.0})
+        self.assertIsNone(selectors.weights("vqf", [1, 2, 3], self.scores, self.margins,
+                                            ["a", "b"], self.angles, vqf_pick=None))
 
 
 class ConfigTests(unittest.TestCase):
@@ -161,6 +129,8 @@ class ConfigTests(unittest.TestCase):
                         {"reconstruction": {"candidate_azimuths": [0, 90]}},
                         {"reconstruction": {"input_elevations": [7]}},
                         {"analysis": {"primary_selector": "ambiguity:nope"}},
+                        {"analysis": {"primary_selector": "vqf"}},  # needs picks
+                        {"analysis": {"ensemble_threshold": 2}},
                         {"analysis": {"combined_weights": {"nope": 1}}},
                         {"analysis": {"combined_weights": {"visual_entropy": 0}}}):
                 path.write_text(yaml.safe_dump({**raw, **bad}))
@@ -311,7 +281,15 @@ class AnalysisTests(unittest.TestCase):
             self.assertAlmostEqual(desk["identity"]["margin"], 0.0)  # candidate at (180, 0)
             self.assertAlmostEqual(desk["oracle"]["margin"], 0.3)
             self.assertAlmostEqual(desk["random"]["margin"], (0.3 - 0.4 + 0.0) / 3)
-            self.assertEqual(db.execute("SELECT COUNT(*) FROM selections").fetchone()[0], 4 * 7)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM selections").fetchone()[0], 4 * 6)
+            # Ensemble filter: a distrusted reconstruction keeps the input view everywhere.
+            filtered = config | {"analysis": config["analysis"] | {"ensemble_threshold": 0.15}}
+            with patch("study.analyze.uncertainties", return_value={1: 0.5, 5: 0.1}):
+                gated = analyze.select_all(db, filtered)
+            self.assertAlmostEqual(gated[1]["oracle"]["margin"], -0.2)
+            self.assertAlmostEqual(gated[5]["oracle"]["margin"], selections[5]["oracle"]["margin"])
+            self.assertAlmostEqual(gated[9]["oracle"]["margin"], gated[9]["input"]["margin"])  # undefined
+            selections = analyze.select_all(db, config)
             from study.compare import build as build_comparison
             page = root / "figures" / "comparison" / "oracle" / "d1.png"
             from study import figures

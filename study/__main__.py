@@ -1,4 +1,4 @@
-"""Run the viewpoint study: render -> reconstruct -> score -> detect -> analyze.
+"""Run the viewpoint study: render -> reconstruct -> score -> pick -> detect -> analyze.
 
 Run inside the container (check nvidia-smi and set gpu_id first):
 
@@ -192,7 +192,7 @@ def gt_key(uid, azimuth, elevation):
 
 
 STAGES = ("render", "reconstruct", "score", "pick", "detect", "analyze")
-WORKERS = {"reconstruct": "sam3d", "score": "sam3d", "pick": "core", "detect": "core", "analyze": "core"}
+WORKERS = {"reconstruct": "sam3d", "score": "sam3d", "pick": "sam3d", "detect": "core", "analyze": "core"}
 CHEAP = {"score": "view_scores", "pick": "picks"}  # Stored results cleared when settings change.
 
 

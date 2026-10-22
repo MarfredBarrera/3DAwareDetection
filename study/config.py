@@ -28,15 +28,15 @@ DEFAULTS = {
                        # reconstructing (1 = none). Not fingerprinted: it only adds a file.
                        "ensemble": 1},
     "ambiguity": {"visual_entropy": {}, "self_occlusion": {}, "surface_normal_entropy": {}},
-    # Pre-detect view picks (study.selectors.PICK_SELECTORS); null disables the
-    # pick stage. vqf: a ViewActive vqf.npz of ground-truth fields; detect_only
-    # runs SAM3 on the inputs and picked candidates only.
+    # Pre-detect view picks: the learned ViewActive ``vqf`` pick plus one seeded
+    # ``random`` and the ``identity`` candidate; null disables the pick stage and
+    # the vqf selector. detect_only runs SAM3 on the inputs and picks only.
     "picks": None,
-    # gt_vqf: Algorithm 1 settings for the gt_* selectors (null disables them);
-    # elevation_range [low, high] degrees limits its targets.
+    # ensemble_threshold: the ensemble filter (null = off). Inputs whose stage-1
+    # disagreement exceeds it keep the input view for every selector; needs the
+    # stage1.npz that reconstruction.ensemble > 1 writes.
     "analysis": {"primary_selector": "ambiguity:combined", "combined_weights": None,
-                 "figure_selectors": None,
-                 "gt_vqf": {"reach_cells": [1, 1], "steps": 9, "elevation_range": None}},
+                 "figure_selectors": None, "ensemble_threshold": None},
 }
 # Settings each stage's stored outputs depend on. Thresholds, input selection,
 # and analysis settings are applied later and may change freely.
@@ -54,7 +54,8 @@ FINGERPRINTS = {
     "score": lambda c: c["ambiguity"],
     "pick": lambda c: c["picks"],
 }
-PICK_DEFAULTS = {"vqf": None, "elevation_range": [0, 45], "seed": 0, "detect_only": True}
+PICK_DEFAULTS = {"viewactive": "/data/checkpoints/viewactive/blender_full_el0_45.pt",
+                 "elevation_range": [0, 45], "seed": 0, "detect_only": True}
 
 
 def _number(value, name, low=-math.inf, high=math.inf):
@@ -176,9 +177,7 @@ def load(path):
     config["picks"] = None
     if raw.get("picks") is not None:
         picks = config["picks"] = _merge(PICK_DEFAULTS, raw["picks"], "picks")
-        if picks["vqf"] is None:
-            raise ValueError("picks.vqf must name a ViewActive vqf.npz")
-        picks["vqf"] = resolve(picks["vqf"], "picks.vqf")
+        picks["viewactive"] = resolve(picks["viewactive"], "picks.viewactive")
         limits = picks["elevation_range"]
         if limits is not None and (not isinstance(limits, list) or len(limits) != 2
                                    or _number(limits[0], "picks.elevation_range", -90, 90)
@@ -189,32 +188,18 @@ def load(path):
             raise ValueError("picks.detect_only must be a boolean")
 
     analysis = _merge(DEFAULTS["analysis"], raw.get("analysis"), "analysis")
-    from study.selectors import GT_SELECTORS, selector_names
-    names = selector_names(config["ambiguity"])
-    gt_vqf = analysis["gt_vqf"]
-    if gt_vqf is not None:
-        gt_vqf = analysis["gt_vqf"] = _merge(DEFAULTS["analysis"]["gt_vqf"], gt_vqf, "analysis.gt_vqf")
-        _integer(gt_vqf["steps"], "analysis.gt_vqf.steps", 1)
-        reach = gt_vqf["reach_cells"]
-        if reach is not None and (not isinstance(reach, list) or len(reach) != 2
-                                  or any(type(r) is not int or r < 0 for r in reach)):
-            raise ValueError("analysis.gt_vqf.reach_cells must be [azimuth, elevation] cell counts or null")
-        limits = gt_vqf["elevation_range"]
-        if limits is not None:
-            if not isinstance(limits, list) or len(limits) != 2:
-                raise ValueError("analysis.gt_vqf.elevation_range must be [low, high] degrees or null")
-            low, high = (_number(v, "analysis.gt_vqf.elevation_range", -90, 90) for v in limits)
-            if low > high or not any(low <= e <= high for e in config["dataset"]["elevations"]):
-                raise ValueError("analysis.gt_vqf.elevation_range must contain a dataset elevation")
+    from study.selectors import selector_names
+    names = selector_names(config["ambiguity"], vqf=config["picks"] is not None)
     if analysis["primary_selector"] not in names:
         raise ValueError(f"analysis.primary_selector must be one of {names}")
     figure_selectors = analysis["figure_selectors"]
-    if figure_selectors is not None:
-        allowed_figures = set(names) | (set(GT_SELECTORS) if gt_vqf is not None else set())
-        if (not isinstance(figure_selectors, list) or not figure_selectors
-                or any(name not in allowed_figures for name in figure_selectors)
-                or len(set(figure_selectors)) != len(figure_selectors)):
-            raise ValueError(f"analysis.figure_selectors must list distinct names from {sorted(allowed_figures)}")
+    if figure_selectors is not None and (
+            not isinstance(figure_selectors, list) or not figure_selectors
+            or any(name not in names for name in figure_selectors)
+            or len(set(figure_selectors)) != len(figure_selectors)):
+        raise ValueError(f"analysis.figure_selectors must list distinct names from {names}")
+    if analysis["ensemble_threshold"] is not None:
+        _number(analysis["ensemble_threshold"], "analysis.ensemble_threshold", 0, 1)
     combined = analysis["combined_weights"]
     if combined is not None:
         if not isinstance(combined, dict) or combined.keys() - config["ambiguity"].keys():

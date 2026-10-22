@@ -1,8 +1,9 @@
-# Calibration set for the SAM3D reconstruction-uncertainty abstention threshold:
+# Calibration set for the ensemble-filter threshold (python -m study.ensemble):
 # all 1,800 ViewActive blender_full objects (66 LVIS categories, all splits),
-# one hash-chosen input view each. The reconstruct stage writes the 3-seed stage-1
-# ensemble (stage1.npz); the existing 1,798 reconstructions have a 4-seed one
-# from scripts.reconstruction_uncertainty stage1.
+# one hash-chosen input view each. The reconstruct stage writes the stage-1
+# ensemble (stage1.npz); the existing 1,798 reconstructions have a 4-seed one.
+# ViewActive was trained on the train split here, so judge the vqf selector on
+# test / test_unseen objects only.
 output_dir: ../outputs/lvis_uncertainty
 gpu_id: 0
 
@@ -38,13 +39,15 @@ reconstruction:
   candidate_distance: 2.0
   resolution: 320
   seed: 42
-  ensemble: 3
+  ensemble: 4
 
-# The label view: the SAM3D candidate nearest the object's ground-truth VQF
-# maximum within elevations 0-45 (plus identity and one random candidate as
-# controls). SAM3 runs on the inputs and these picks only.
+# The learned ViewActive pick within elevations 0-45 (plus identity and one
+# random candidate as controls). SAM3 runs on the inputs and these picks only.
 picks:
-  vqf: ../outputs/viewactive/blender_full_el0_45/vqf.npz
   elevation_range: [0, 45]
   seed: 0
   detect_only: true
+
+analysis:
+  primary_selector: vqf
+  ensemble_threshold: 0.15

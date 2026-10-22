@@ -391,8 +391,7 @@ def _objects(rows):
 
 
 SELECTOR_FIGURES = {"oracle": "best SAM3D view per input (uses labels)",
-                    "detector_entropy": "lowest SAM3 score entropy per input",
-                    "detector_gap": "largest SAM3 top-1 minus top-2 gap per input"}
+                    "top2gap": "largest SAM3 top-1 minus top-2 gap per input"}
 
 
 def save_view_comparison(config, category, uid, members, before, picked_paths,
@@ -494,9 +493,11 @@ def reconstruction_figure(db, config, input_key, path):
     rivals = {angle[i]: _higher_scoring_categories(prompt_scores.get(i, {}), source["category"])
               for i in result}
     marks = {}
-    for name in selector_names(metrics):
+    vqf_pick = db.execute("SELECT pick_id FROM picks WHERE selector='vqf' AND input_id=?",
+                          (source["image_id"],)).fetchone()
+    for name in selector_names(metrics, vqf=vqf_pick is not None):
         picked = weights(name, list(result), scores, margins, metrics, angle, prompt_scores,
-                         config["analysis"].get("combined_weights")) or {}
+                         config["analysis"].get("combined_weights"), vqf_pick and vqf_pick[0]) or {}
         marks[name] = {angle[i] for i in picked}
     primary = config["analysis"]["primary_selector"]
     panels = [margin_heatmap({angle[i]: m for i, m in margins.items()}, "SAM3 margin (oracle marked)",

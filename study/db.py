@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS reconstructions (
     error TEXT
 );
 -- Written by the pick stage, before detection: the candidate each pick
--- selector chooses for each input; meta holds its angles and target.
+-- selector (vqf, identity, random) chooses for each input; meta holds its quality.
 CREATE TABLE IF NOT EXISTS picks (
     input_id INTEGER NOT NULL REFERENCES images(image_id),
     selector TEXT NOT NULL,

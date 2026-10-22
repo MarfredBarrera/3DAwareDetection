@@ -36,40 +36,21 @@ def directory_for(image):
     return f"renders/sam3d/{image['uid']}/a{image['azimuth']:g}_e{image['elevation']:g}"
 
 
-_STORE = None
-
-
-def _canonical_mesh(root, canonical, uid):
-    """(vertices, faces) of a ground-truth object in the reviewed render frame."""
-    global _STORE
-    from harness.meshio import ObjaverseStore
-
-    if _STORE is None or (_STORE.root, _STORE.canonical_path) != (root, canonical):
-        _STORE = ObjaverseStore(root, canonical)
-        _STORE.canonical_path = canonical
-    mesh = _STORE.load(uid, device="cpu")
-    if mesh is None:
-        raise RuntimeError(f"unloadable mesh {uid}")
-    return mesh.verts.numpy().astype(np.float64), mesh.faces.numpy().astype(np.int32)
-
-
 def _score(task):
-    """Worker: all metrics for one reconstruction, or for all ground-truth views of one
-    object (``source = (root, canonical, uid)``); returns (label, rows, error)."""
+    """Worker: all metrics for one reconstruction's candidates; returns (directory, rows, error)."""
     from study.ambiguity import score_candidates
 
-    output, label, source, candidates, metrics, distance, target = task
+    output, directory, candidates, metrics, distance = task
     output = Path(output)
     views = [{"azimuth": c["azimuth"], "elevation": c["elevation"],
               "image": output / c["path"], "mask": output / c["mask_path"]} for c in candidates]
     try:
-        mesh = _canonical_mesh(*source) if isinstance(source, tuple) else output / source
-        values = score_candidates(mesh, views, metrics, distance, target)
+        values = score_candidates(output / directory, views, metrics, distance, (0.0, 0.0, 0.0))
     except Exception as error:  # One bad mesh must not stop the stage.
-        return label, [], f"{type(error).__name__}: {error}"
+        return directory, [], f"{type(error).__name__}: {error}"
     rows = [(candidate["image_id"], metric, score)
             for candidate, value in zip(candidates, values) for metric, score in value.items()]
-    return label, rows, None
+    return directory, rows, None
 
 
 def reconstruct(config, limit=None):
@@ -93,11 +74,9 @@ def reconstruct(config, limit=None):
         try:
             candidates = model.render_views(
                 output / image["path"], output / image["mask_path"], output / relative,
-                resolution=recon["resolution"], seed=recon["seed"],
-                view_grid=(recon["candidate_azimuths"], recon["candidate_elevations"]),
-                save_ply=False,
-                view_distance=recon["candidate_distance"],
-                input_elevation=image["elevation"], ensemble=recon["ensemble"])
+                recon["candidate_azimuths"], recon["candidate_elevations"],
+                input_elevation=image["elevation"], distance=recon["candidate_distance"],
+                resolution=recon["resolution"], seed=recon["seed"], ensemble=recon["ensemble"])
             if not (output / relative / "mesh.npz").is_file():
                 raise RuntimeError("SAM3D returned no mesh; mesh ambiguity metrics need one")
         except Exception as error:  # Recorded per input; the remaining inputs continue.
@@ -126,10 +105,7 @@ def reconstruct(config, limit=None):
 
 
 def score(config, workers=4):
-    """Ambiguity metrics for every SAM3D candidate (reconstructed mesh) and every
-    visible ground-truth view (canonical mesh, harness camera)."""
-    from tools.cameras import HARNESS_LOOK_AT
-
+    """Ambiguity metrics for every SAM3D candidate, on the reconstructed mesh."""
     output = Path(config["output_dir"])
     metrics = config["ambiguity"]
     wanted = len(metrics)
@@ -143,21 +119,8 @@ def score(config, workers=4):
             "SELECT COUNT(*) FROM view_scores s JOIN images i USING (image_id)"
             " WHERE i.parent_id=?", (input_id,)).fetchone()[0]
         if scored < wanted * len(candidates):
-            tasks.append((str(output), directory, directory, candidates, metrics, distance, (0.0, 0.0, 0.0)))
-    reconstructions = len(tasks)
-    dataset = config["dataset"]
-    scored = {row[0] for row in db.execute(
-        "SELECT s.image_id FROM view_scores s JOIN images i USING (image_id) WHERE i.source='gt'"
-        " GROUP BY s.image_id HAVING COUNT(*) >= ?", (wanted,))}
-    views = {}
-    for image in store.images(db, "source='gt' AND visible_px > 0"):
-        views.setdefault(image["uid"], []).append(image)
-    for uid, images in views.items():
-        if any(image["image_id"] not in scored for image in images):
-            tasks.append((str(output), f"gt/{uid}", (dataset["root"], dataset["canonical"], uid), images,
-                          metrics, dataset["distance"], tuple(HARNESS_LOOK_AT)))
-    print(f"[score] {reconstructions} reconstructions and {len(tasks) - reconstructions} ground-truth "
-          f"objects to score with {sorted(metrics)}", flush=True)
+            tasks.append((str(output), directory, candidates, metrics, distance))
+    print(f"[score] {len(tasks)} reconstructions to score with {sorted(metrics)}", flush=True)
     if not tasks:
         return
     failures = 0
@@ -175,34 +138,46 @@ def score(config, workers=4):
 
 
 def pick(config):
-    """Pre-detect view picks for every reconstructed input (``picks`` config)."""
-    from study.selectors import picks
-    from viewactive.grid import Grid, combine
-
+    """Pre-detect picks for every reconstructed input (``picks`` config): the learned
+    ViewActive ``vqf`` candidate, the ``identity`` candidate and one seeded ``random`` one."""
     settings = config.get("picks")
     if settings is None:
         print("[pick] no picks configured", flush=True)
         return
-    vqf = np.load(settings["vqf"])
-    grid = Grid(tuple(map(float, vqf["azimuths"])), tuple(map(float, vqf["elevations"])))
-    fields = {str(uid): o for o, uid in enumerate(vqf["uids"])}
-    norm = vqf["norm"]
-    db = store.connect(Path(config["output_dir"]))
+    use_gpu(config["gpu_id"])
+    from perception.select import vqf_pick
+    from tools.cameras import SAM3D_INPUT_VIEW
+    from viewactive.grid import sam3d_to_viewactive
+    from viewactive.model import ViewActive
+
+    output = Path(config["output_dir"])
+    db = store.connect(output)
     done = {row[0] for row in db.execute("SELECT DISTINCT input_id FROM picks")}
     pending = [image for image in store.images(db, "i.image_id IN (SELECT input_id FROM reconstructions"
                                                 " WHERE status='ok')") if image["image_id"] not in done]
-    missing = 0
-    with db:
-        for image in pending:
-            o = fields.get(image["uid"])
-            missing += o is None
-            field = None if o is None else combine(norm[o])
-            candidates = store.images(db, "i.parent_id=?", (image["image_id"],))
-            for selector, (pick_id, meta) in picks(image, candidates, field, grid,
-                                                   settings["elevation_range"], settings["seed"]).items():
+    print(f"[pick] {len(pending)} inputs to pick", flush=True)
+    if not pending:
+        return
+    model = ViewActive.load(settings["viewactive"])
+    for count, image in enumerate(pending, 1):
+        candidates = store.images(db, "i.parent_id=?", (image["image_id"],))
+        with Image.open(output / image["path"]) as rgb, Image.open(output / image["mask_path"]) as mask:
+            field = model.predict([rgb.convert("RGB")], [mask.convert("L")])[0]
+        angles = [sam3d_to_viewactive(c["azimuth"], c["elevation"], image["elevation"]) for c in candidates]
+        quality = model.score_views(field, *zip(*angles))
+        best = vqf_pick({n: (float(q), e) for n, (q, (_, e)) in enumerate(zip(quality, angles))},
+                        settings["elevation_range"])
+        rng = np.random.default_rng([settings["seed"], image["image_id"]])
+        chosen = {"vqf": (candidates[best], {"quality": float(quality[best]), "absolute": list(angles[best])}),
+                  "random": (candidates[int(rng.integers(len(candidates)))], {})}
+        chosen.update({"identity": (c, {}) for c in candidates
+                       if (c["azimuth"], c["elevation"]) == SAM3D_INPUT_VIEW})
+        with db:
+            for selector, (candidate, meta) in chosen.items():
                 db.execute("INSERT OR REPLACE INTO picks VALUES (?, ?, ?, ?)",
-                           (image["image_id"], selector, pick_id, store.pack(meta)))
-    print(f"[pick] {len(pending)} inputs picked ({missing} without a ground-truth VQF)", flush=True)
+                           (image["image_id"], selector, candidate["image_id"], store.pack(meta)))
+        if count % PROGRESS_EVERY == 0 or count == len(pending):
+            print(f"[pick] {count}/{len(pending)}", flush=True)
     db.close()
 
 

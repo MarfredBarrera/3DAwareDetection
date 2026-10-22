@@ -11,6 +11,11 @@
    render candidate views, choose the least ambiguous one, run SAM3 on it, and
    show that false positives drop. It works on hand-picked cases; the study
    pipeline makes it systematic.
+3. **Test the pipeline inside off-the-shelf zero-shot navigation planners**
+   (ApexNav first). The pipeline is `perception.Verifier`: SAM3 -> SAM3D ->
+   optional ensemble filter -> `vqf` or `top2gap` view -> SAM3. Keep it a
+   single, simple API that a planner can call; evaluation code reuses
+   `perception.select` rather than reimplementing the rules.
 
 Everything in the repo should serve these goals. Remove outdated code and data
 rather than keeping parallel versions. Changes should make experimenting easy:
@@ -36,11 +41,17 @@ reusable plots, and all images, angles, and scores stored in the study database.
   `identity` and `random`.
 - Learned metric weights were ~1/3 each and not significantly better than equal
   weights (p 0.2-0.46), so `ambiguity:combined` uses equal-weight ranks.
+- **Ensemble filter**: stage-1 seed disagreement (1 - mean pairwise F-score of
+  occupancies) in [0, 1]; trusted when <= the threshold (0.15 by default;
+  0.10-0.20 keeps ~99% of useful reconstructions, `study.ensemble calibrate`).
 
 ## Layout and workflow
 
+- `perception/` is the runtime pipeline (two persistent model workers, one per
+  env); `python -m perception` verifies one frame. `scripts/apexnav_fp.py`
+  evaluates it on ApexNav's false-positive episodes.
 - `python -m study --config configs/<name>.yaml` runs render -> reconstruct ->
-  score -> detect -> analyze. Stages resume. Outputs are in `outputs/<study>/`,
+  score -> pick -> detect -> analyze. Stages resume. Outputs are in `outputs/<study>/`,
   with `study.sqlite` as the source of truth. See README.md. `outputs/` and
   `data/` stay on the server; archive large finished datasets (e.g. completed
   render runs) to `/ICONAS/users/marfred/3DAwareVerification/` and delete the
@@ -54,7 +65,7 @@ reusable plots, and all images, angles, and scores stored in the study database.
 - Shared GPU server: check `nvidia-smi` and set `gpu_id` to an idle GPU before
   every GPU run.
 - Tests: `sam3d-env core python -m unittest discover -s tests`, plus
-  `test_ambiguity.py`, `test_harness.py` and
-  `test_stage1_uncertainty.py` in the `sam3d` env.
+  `test_ambiguity.py`, `test_harness.py`, `test_viewactive.py` and
+  `test_gt_error.py` in the `sam3d` env.
 - Keep config validation in `study/config.py`; don't add new YAML entry points
   outside `configs/`.

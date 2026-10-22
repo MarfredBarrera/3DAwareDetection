@@ -41,13 +41,16 @@ ambiguity:
   self_occlusion: {samples: 20000, seed: 0}
   surface_normal_entropy: {samples: 20000, seed: 0, polar_bins: 9, azimuth_bins: 18}
 
+# Learned ViewActive pick per input (upright objects were excluded from its
+# training). Every candidate is already detected, so detect_only is off.
+picks:
+  detect_only: false
+
 analysis:
   primary_selector: ambiguity:combined
-  figure_selectors: [identity, random, ambiguity:combined, detector_entropy,
-                     detector_gap, oracle, gt_vqf, gt_random, gt_oracle]
+  figure_selectors: [identity, random, ambiguity:combined, top2gap, vqf, oracle]
   # Weights of each metric's within-input rank in ambiguity:combined (missing
   # metrics get 0; null = equal). Analysis-only: rerun with --stages analyze.
   combined_weights: {visual_entropy: 0.2, self_occlusion: 0.4, surface_normal_entropy: 0.4}
-  # gt_* selectors: Algorithm 1 on each object's ground-truth VQF (ground-truth
-  # views scored with the same metrics), targets limited to elevations 0..45.
-  gt_vqf: {reach_cells: [1, 1], steps: 9, elevation_range: [0, 45]}
+  # Ensemble filter (null = off); needs stage1.npz per reconstruction.
+  ensemble_threshold: null

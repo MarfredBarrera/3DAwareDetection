@@ -33,12 +33,10 @@ The 14-object Blender smoke run completed every stage. All 1,848 camera poses
 passed geometric verification. No view was empty or clipped; the median mask
 bounding box occupied 59% of the larger frame dimension. This validates the
 rendering and data pipeline, not the paper's accuracy claim. The full render
-is supervised by `scripts/supervise_viewactive.sh` and resumes at shard
-boundaries. The corrected PyTorch3D split completed its 60-epoch model and
-evaluation first; its Fig. 4 quality values are within 0.04 of the paper's
-step-9 plot readings, but all four recognition models remain substantially
-below the paper. Run `python -m scripts.compare_viewactive_paper
-outputs/viewactive/fidelity_split/eval/fig4.json` for exact gaps.
+resumes at shard boundaries. The corrected PyTorch3D split completed its
+60-epoch model and evaluation first; its Fig. 4 quality values are within 0.04
+of the paper's step-9 plot readings, but all four recognition models remain
+substantially below the paper.
 The paired appearance sheet for eight pilot objects is
 `outputs/viewactive/blender_pilot/eval/render_comparison.png`.
 
@@ -80,8 +78,8 @@ validation objects and checked once on the held-out test objects.
   Set it to `0.15` for a square white-padded crop around each modal mask before
   the timm transform. This changes classifier evaluation only. Use a fresh
   output directory or regenerate classifier outputs when changing the setting.
-- The full-frame versus cropped classifier experiment completed on the pilot;
-  its report is `outputs/viewactive/pilot/eval/crop_experiment/report.json`.
+- The full-frame versus cropped classifier experiment completed on the pilot
+  (its code was removed in the 2026-10-22 cleanup; it is in git history).
 - The paper-scale run finished on 2026-10-09. It includes 1,800 objects,
   237,600 renders, all four classifiers, 60 training epochs, and evaluation.
   Its evaluation was regenerated on CPU after the fix for undefined quality
@@ -164,9 +162,11 @@ Every stage resumes after an interruption.
 | `evaluate.py` | Field metrics, Fig. 4 rollouts, plots, FPS |
 
 **Configs:**
-- `configs/viewactive.yaml` (full scale, the paper's 1,600 seen + 200 unseen objects)
-- `configs/viewactive_pilot.yaml` (150 objects)
-- `configs/viewactive_smoke.yaml` (14 NAS objects)
+- `configs/viewactive_blender.yaml` (full scale, the paper's 1,600 seen + 200 unseen objects)
+- `configs/viewactive_blender_el0_45.yaml` (the same with Algorithm 1 targets limited to
+  elevations 0-45; its model is the one the pipeline uses,
+  `/data/checkpoints/viewactive/blender_full_el0_45.pt`)
+- `configs/viewactive_blender_smoke.yaml` (5 classes, a few objects each)
 - `configs/viewactive_imagenet_map.yaml` (94 LVIS categories mapped to ImageNet-1k
   indices, checked against `timm.data.ImageNetInfo`)
 
@@ -322,61 +322,19 @@ is 140×47 px. The classifiers receive the whole frame without cropping to the
 object, and timm's transform then centre-crops it further. The paper's Blender
 renders were probably framed tightly.
 
-## Next steps
+## Use in the pipeline
 
-1. **Crop test** (implementation ready; 8,712 pilot test images, no re-rendering).
-   Once a GPU is available, run ResNet50 and ViT on square crops around the
-   modal masks with 15% margin, padded white:
-   ```
-   sam3d-env sam3d python -m viewactive.crop_experiment --config configs/viewactive_pilot.yaml
-   ```
-   The command reuses the full-frame classifier caches and writes cropped top-1
-   arrays plus paired accuracy and object-bootstrap intervals to
-   `outputs/viewactive/pilot/eval/crop_experiment/`. It reports all-view,
-   highest-quality-view, and any-view accuracy. If cropping lifts accuracy
-   substantially, set `classification.crop_margin: 0.15` for later classifier
-   evaluation. It affects neither labels nor training.
-2. **Regenerate after the colour fix.** The shared mesh loader fix and unit
-   test are complete. It changes renders, so pilot renders, labels (visual
-   entropy), features and classifications must be regenerated. Keep the old
-   pilot output for comparison and use a fresh output directory for the rerun.
-3. **If accuracy is still low after steps 1–2:** consider a PyTorch3D
-   `TexturesUV` path in the harness behind a flag (one shared code path), and
-   check the uncertain class mappings: pumpkin → jack-o'-lantern, mask, table,
-   dresser → chiffonier, dog → all breeds 151–268, television_set and mushroom.
-4. **Re-evaluate the pilot.** Acceptance: oracle accuracy at step 9 is at least
-   0.35 for most classifiers, and ViewActive beats `random_walk` and `stay` on
-   accuracy as well as quality. Also tune on the validation split: min–max vs.
-   raw targets, and reach (1,1) vs. (2,2) vs. unlimited.
-5. **Compare against the original full-run targets:**
-   - Step-9 quality values within ±0.10 of the paper's Fig. 4.
-   - Mean accuracy gain of at least +0.15 from step 0 to step 9.
-   - Accuracy saturates by step 6.
-   - ViewActive beats `random_walk` and `stay`, with the bootstrap CI
-     excluding 0.
-6. **Housekeeping:**
-   - Rerun the `core` test suite.
-   - Delete `outputs/viewactive/smoke`, which was built with the old up-axis
-     setting, before rerunning smoke.
-   - Visually check the handedness of `grid.sam3d_to_viewactive`: does the
-     SAM3D (90, 0) candidate map to relative azimuth +90?
-   - Run the GPU-dependent ViewActive tests in the `sam3d` environment.
-   - Commit when ready.
-7. **Phase 2, study integration:**
-   - Add a `viewactive` stage that stores predicted fields per input in the
-     study DB.
-   - Add a `viewactive` selector in `study/selectors.py` / `analyze.select_all`
-     that maps SAM3D candidate angles with `sam3d_to_viewactive` and picks the
-     best interpolated combined quality.
-   - Compare it against `identity`, `random`, `ambiguity:*` and `oracle`.
+The `blender_full_el0_45` model is the `vqf` selector of `perception.Verifier`
+and of the study's `pick` stage: it predicts the field from the input image and
+mask, maps each SAM3D candidate with `grid.sam3d_to_viewactive`, and picks the
+best interpolated combined quality within absolute elevations 0-45. Earlier
+PyTorch3D runs (`full`, `pilot`, `smoke`, `fidelity_split`) and their configs were
+removed in the 2026-10-22 cleanup; they are in git history.
 
 ## Operational notes
 
-- The full run can be supervised with `bash scripts/supervise_viewactive.sh`
-  inside the dev container. It waits for the active driver's lock, resumes
-  incomplete stages after transient process failures (up to three attempts),
-  and records its decisions in `logs/supervisor.log`. An interrupted training
-  run retrains unless `model/history.json` records every configured epoch.
+- An interrupted training run retrains unless `model/history.json` records
+  every configured epoch.
 - Host memory pressure earlier caused systemd-oomd to kill the dev container
   three times (exit 137). It was fine on the last run. Watch
   `/proc/pressure/memory` on long runs.

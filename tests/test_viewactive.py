@@ -120,24 +120,6 @@ class OptimizeTests(unittest.TestCase):
         self.assertTrue(all(5 <= e <= 8 for e, _ in walk[5:]))
 
 
-class CropExperimentTests(unittest.TestCase):
-    def test_scores_pair_the_same_objects_and_best_quality_views(self):
-        from viewactive.crop_experiment import score, summarize
-
-        quality = np.zeros((2, 3, 2, 2))
-        quality[:, :, 0, 1] = 1
-        full = np.array([[[0, 1], [0, 0]], [[0, 0], [0, 1]]])
-        cropped = np.array([[[0, 1], [0, 1]], [[0, 1], [0, 1]]])
-        categories = np.array(["chair", "chair"])
-        mapping = {"chair": [1]}
-        before = score(full, categories, mapping, quality)
-        after = score(cropped, categories, mapping, quality)
-        report = summarize(before, after, np.array(["test", "test_unseen"]))
-        self.assertEqual(report["seen"]["metrics"]["all_views"]["difference"], 0.25)
-        self.assertEqual(report["unseen"]["metrics"]["best_quality_view"]["difference"], 1.0)
-        self.assertEqual(report["seen"]["metrics"]["any_view"]["difference"], 0.0)
-
-
 class LabelTests(unittest.TestCase):
     def test_normalize_range_nan_and_constant_channel(self):
         raw = np.random.default_rng(0).random((3, 11, 12)).astype(np.float32)
@@ -339,7 +321,7 @@ class ConfigTests(unittest.TestCase):
     def test_defaults_and_shipped_configs(self):
         config = self.load("output_dir: out\n")
         self.assertEqual(len(config["render"]["azimuths"]) * len(config["render"]["elevations"]), 132)
-        for name in ("viewactive.yaml", "viewactive_pilot.yaml", "viewactive_smoke.yaml"):
+        for name in ("viewactive_blender.yaml", "viewactive_blender_el0_45.yaml", "viewactive_blender_smoke.yaml"):
             self.assertTrue(load_viewactive(CONFIGS / name)["cohort"]["class_map"].endswith(
                 "viewactive_imagenet_map.yaml"))
         blender = load_viewactive(CONFIGS / "viewactive_blender.yaml")

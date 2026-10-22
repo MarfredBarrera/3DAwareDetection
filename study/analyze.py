@@ -15,8 +15,7 @@ from study import config as settings_io
 from study import db as store
 from study import figures
 from study.labels import outcomes
-from study.selectors import GT_SELECTORS, gt_view_weights, gt_vqf_field, selector_names, weights
-from viewactive.grid import Grid
+from study.selectors import selector_names, weights
 
 FIELDS = ("margin", "correct", "fp_rate", "any_fp", "tp")
 SUBSETS = {"all inputs": lambda before: True,
@@ -31,58 +30,62 @@ def _values(outcome, vocabulary_size):
             "tp": float(outcome["tp"])}
 
 
+def uncertainties(db, config):
+    """{input_id: stage-1 ensemble disagreement} for every reconstruction (None = undefined)."""
+    from reconstruction.stage1_uncertainty import load_ensemble
+
+    output = Path(config["output_dir"])
+    rows = db.execute("SELECT input_id, directory FROM reconstructions WHERE status='ok'").fetchall()
+    missing = [d for _, d in rows if not (output / d / "stage1.npz").is_file()]
+    if missing:
+        raise ValueError(f"analysis.ensemble_threshold needs stage1.npz; {len(missing)} reconstructions "
+                         f"lack it (e.g. {missing[0]}); reconstruct with reconstruction.ensemble > 1")
+    return {i: load_ensemble(output / d / "stage1.npz")["ensemble"]["disagreement"] for i, d in rows}
+
+
 def select_all(db, config):
-    """Rebuild the ``selections`` table; returns {input_id: {selector: row}}."""
+    """Rebuild the ``selections`` table; returns {input_id: {selector: row}}.
+
+    With ``analysis.ensemble_threshold``, inputs whose reconstruction the ensemble
+    filter distrusts keep the input view for every selector.
+    """
+    from perception.select import trusted
+
     vocabulary = config["dataset"]["categories"]
     detection = config["detection"]
     metrics = list(config["ambiguity"])
-    names = selector_names(metrics)
+    names = selector_names(metrics, vqf=config.get("picks") is not None)
     before = outcomes(db, vocabulary, detection, "i.source='gt'")
     after = outcomes(db, vocabulary, detection, "i.source='sam3d'")
     scores = store.view_scores(db, "i.source='sam3d'")
     prompt_scores = store.prompt_scores(db, "i.source='sam3d'")
+    vqf_picks = dict(db.execute("SELECT input_id, pick_id FROM picks WHERE selector='vqf'"))
+    threshold = config["analysis"].get("ensemble_threshold")
+    uncertainty = uncertainties(db, config) if threshold is not None else {}
     children, angles = {}, {}
     for row in store.images(db, "source='sam3d'"):
         if row["image_id"] in after:
             children.setdefault(row["parent_id"], []).append(row["image_id"])
             angles[row["image_id"]] = (row["azimuth"], row["elevation"])
     size = len(vocabulary)
-    # Ground-truth-view selectors: Algorithm 1 on each object's ground-truth VQF.
-    gt_settings = config["analysis"].get("gt_vqf")
-    gt_scores = store.view_scores(db, "i.source='gt'") if gt_settings is not None else {}
-    grid = Grid(tuple(map(float, config["dataset"]["azimuths"])),
-                tuple(map(float, config["dataset"]["elevations"])))
-    cells, position = {}, {}
-    for row in store.images(db, "source='gt'"):
-        if row["image_id"] in before and row["image_id"] in gt_scores:
-            cell = (grid.elevations.index(row["elevation"]), grid.azimuths.index(row["azimuth"]))
-            cells.setdefault(row["uid"], {})[cell] = row["image_id"]
-            position[row["image_id"]] = (row["uid"], cell)
-    fields = {uid: gt_vqf_field(views, gt_scores, metrics, grid) for uid, views in cells.items()}
     result = {}
     for input_id, candidates in children.items():
         if input_id not in before:
             continue
         rows = {"input": {**_values(before[input_id], size), "pick_id": input_id}}
+        if not trusted(uncertainty.get(input_id), threshold):
+            rows.update({name: rows["input"] for name in names})
+            result[input_id] = rows
+            continue
         margins = {i: after[i]["margin"] for i in candidates}
         for name in names:
             weight = weights(name, candidates, scores, margins, metrics, angles, prompt_scores,
-                             config["analysis"].get("combined_weights"))
+                             config["analysis"].get("combined_weights"), vqf_picks.get(input_id))
             if weight is None:
                 continue
             values = {field: sum(w * _values(after[i], size)[field] for i, w in weight.items())
                       for field in FIELDS}
             rows[name] = {**values, "pick_id": max(weight, key=weight.get)}
-        if input_id in position:
-            uid, cell = position[input_id]
-            gt_margins = {i: before[i]["margin"] for i in cells[uid].values()}
-            for name in GT_SELECTORS:
-                weight = gt_view_weights(name, cell, cells[uid], fields[uid], gt_margins, grid, gt_settings)
-                if weight is None:
-                    continue
-                values = {field: sum(w * _values(before[i], size)[field] for i, w in weight.items())
-                          for field in FIELDS}
-                rows[name] = {**values, "pick_id": max(weight, key=weight.get)}
         result[input_id] = rows
     with db:
         db.execute("DELETE FROM selections")
@@ -142,6 +145,10 @@ def write_markdown(summary, before, primary, path):
              f"Before (ground-truth views): {before['views']} visible views of {before['objects']} objects; "
              f"top-1 accuracy {before['correct']:.1%}, views with any false positive {before['any_fp']:.1%}, "
              f"mean confidence margin {before['margin']:+.3f}.", ""]
+    if "ensemble_filter" in summary:
+        ensemble = summary["ensemble_filter"]
+        lines += [f"Ensemble filter on: disagreement <= {ensemble['threshold']:g} trusts "
+                  f"{ensemble['trusted']:.1%} of reconstructions; the rest keep the input view.", ""]
     if not summary["subsets"]:
         lines += ["No reconstructed inputs have complete detections and scores yet.", ""]
     for subset, data in summary["subsets"].items():
@@ -162,10 +169,8 @@ def write_markdown(summary, before, primary, path):
                          f"worse on {paired['worse']:.1%} (mean change {paired['mean_margin_change']:+.3f}).")
         lines.append("")
     lines += ["`input` is SAM3 on the original view; `identity` re-renders the reconstruction from "
-              "the input view; `oracle` picks the best candidate using SAM3 itself (upper bound). "
-              "`gt_*` selectors pick another ground-truth view of the same object: `gt_vqf` follows "
-              "the ground-truth VQF (Algorithm 1), `gt_random` and `gt_oracle` are its controls "
-              "(see study/selectors.py).", ""]
+              "the input view; `top2gap` and `vqf` are the label-free selectors of `perception`; "
+              "`oracle` picks the best candidate using SAM3 itself (upper bound; see study/selectors.py).", ""]
     Path(path).write_text("\n".join(lines))
 
 
@@ -191,6 +196,11 @@ def main():
     selections = select_all(db, config)
     summary = summarize(selections, {i: gt_rows[i]["uid"] for i in selections}, primary)
     summary = {"before": before, "primary_selector": primary, "detection": config["detection"], **summary}
+    threshold = config["analysis"].get("ensemble_threshold")
+    if threshold is not None:
+        from perception.select import trusted
+        kept = [trusted(u, threshold) for i, u in uncertainties(db, config).items() if i in selections]
+        summary["ensemble_filter"] = {"threshold": threshold, "trusted": float(np.mean(kept)) if kept else None}
     (output / "summary.json").write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n")
     write_markdown(summary, before, primary, output / "summary.md")
     paths = figures.study_figures(db, config, gt, selections, summary,
