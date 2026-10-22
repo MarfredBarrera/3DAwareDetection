@@ -42,10 +42,10 @@ each per frame) is rejected.
 
 Stop backstop (review 2026-10-22): over-depth targets and the extreme "others" cloud have no cluster id, so the
 FSM also checks at the stop itself. When `callActionPlanner` returns `REACH_OBJECT` and the target cluster is not
-accepted, it resolves the nearest non-rejected cluster with a cell within 0.75 m of the target object point
+accepted, it resolves the nearest non-rejected cluster with target-label confidence > 0 and a cell within 0.75 m of the target object point
 (`ExplorationData::target_object_pos_`, the nearest point of the target cloud; `next_pos_` is the approach point
-0.5-0.85 m away) and requests it (`at_stop`); with no such cluster it requests the bare position
-(`cluster_id = -1`, centroid = object point). Accept -> stop; reject -> no stop, the cluster is rejected and the
+0.5-0.85 m away) and requests it (`at_stop`, centroid = the object point, which Python matches evidence to);
+with no such cluster it requests the bare position (`cluster_id = -1`, centroid = object point). Accept -> stop; reject -> no stop, the cluster is rejected and the
 position is cut out of over-depth target clouds (`ObjectMap2D::suppressPosition`, 0.75 m), then replan. With
 the gate on, the extreme "others" fallback (other-class clusters) is never a target. Request seqs never reset;
 Python drops requests with seq <= the last one seen when the episode started.
@@ -55,9 +55,11 @@ reopens a rejected cluster (sends `state=0`, so the next selection re-requests i
 at least `recheck_cooldown_steps` sim steps since the last check, a new evidence view whose camera position is
 >= `recheck_min_distance_m` from every previously used view of that cluster (or viewing direction differs by
 >= `recheck_min_angle_deg`), and fewer than `max_checks` checks so far. Reopen checks run in `observe()`, so
-they cost nothing until a new view qualifies. Re-spawned clusters: a new cluster within 0.75 m of a rejected one
-inherits the rejection (check count, cooldown) without a server call, and verdicts are cached per evidence view
-(step, index), so a cluster whose best view was already judged reuses that verdict.
+they cost nothing until a new view qualifies. Re-spawned clusters: verdicts are cached per evidence view
+(step, index), so a cluster whose selected view was already judged reuses that verdict without a server call.
+There is no centroid-based inheritance (re-review: it permanently rejected distinct real objects next to a false
+positive): a view nearer another cluster (as clusters stood at its step) is not evidence for this one, and ties
+prefer the nearest view, so a nearby distinct object is judged on its own views.
 
 C++ changes (ApexNav):
 1. `src/planner/plan_env/msg/VerificationRequest.msg`
@@ -111,7 +113,8 @@ Evidence: `VerificationGate.observe()` stores each label-0 detection (step, rgb,
 `get_object_point_cloud(..., return_centroids=True)`, camera pose, pitch, semantic instance, that step's cluster
 centroids) in `perception_gate/evidence.py`'s `EvidenceStore`: per 0.75 m cell of the world centroid, the 8 most
 readable views plus the newest; past 256 views the most crowded cell loses its worst non-newest view (a place's
-last view is never dropped). A request picks the best view within 0.75 m of the cluster centroid (as it stood at
+last view is never dropped). Memory: at most 256 stored views, each holding a reference to its 640x480 RGB frame
+(0.9 MB) plus its mask (0.3 MB), so ~236 MB of frames worst case (one view per frame) plus masks. A request picks the best view within 0.75 m of the cluster centroid (as it stood at
 the view's step), else the nearest within 1.5 m, else `on_no_evidence` (default accept, logged). The ranking
 (`view_quality`, `mask_touches_border`) is a copy of `episode_visualization.py`'s, so `perception_gate` runs on a
 clean checkout. Intrinsics (hfov, width, height) are logged with every decision.
@@ -197,7 +200,9 @@ clean checkout. Intrinsics (hfov, width, height) are logged with every decision.
 ## 7. Risks / open questions
 
 1. Uncommitted ApexNav work (user decision: leave them): new branch from the current worktree; no stash/checkout/reset; `git add` explicit paths.
-2. Over-depth targets are not verified (0/89 FP records ended that way).
+2. Give-up stops are not verified, by design: `NO_FRONTIER`, `STUCKING` and the forced `STOP` at the step limit
+   end the episode without committing to an object, so there is nothing to verify (they are failures either way).
+   Every object stop (`REACH_OBJECT`, incl. soft reach and over-depth targets) passes the gate or its backstop.
 3. Wrong rejections: mitigated by the cooldown re-check; tune cooldown values on the FP records.
 4. Failure policy: fail-open (user decision), always logged.
 5. After a rejection the planner may chase lower-confidence clusters, each costing a verification.
