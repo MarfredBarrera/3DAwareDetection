@@ -42,7 +42,7 @@ The ViewActive model is trained here, not downloaded. The pipeline expects it at
 ```python
 from perception import Verifier
 
-with Verifier(selector="vqf",              # or "top2gap"
+with Verifier(selector="vqf",              # or "top2gap"; "input" = SAM3 on the raw frame, no SAM3D
               ensemble=True,               # the ensemble filter; False turns it off
               ensemble_threshold=0.15,
               on_uncertain="input",        # distrusted: classify the raw frame ("reject", "accept")

@@ -161,6 +161,8 @@ def serve(argv):
     parser.add_argument("--selector", choices=select.SELECTORS, default="vqf")
     parser.add_argument("--no-ensemble", action="store_true", help="turn the ensemble filter off")
     parser.add_argument("--threshold", type=float, default=0.15, help="ensemble disagreement threshold")
+    parser.add_argument("--judge-input", action="store_true",
+                        help="the raw frame must also show the target (rejects before SAM3D)")
     parser.add_argument("--on-uncertain", choices=select.ON_UNCERTAIN, default="input")
     parser.add_argument("--vocabulary", nargs="+", default=list(HOUSEHOLD),
                         help="default vocabulary (a request may send its own)")
@@ -168,12 +170,13 @@ def serve(argv):
     args = parser.parse_args(argv)
 
     args.log_dir.mkdir(parents=True, exist_ok=True)
-    settings = {"selector": args.selector, "ensemble": not args.no_ensemble,
-                "threshold": None if args.no_ensemble else args.threshold,
-                "on_uncertain": args.on_uncertain, "vocabulary": args.vocabulary, "gpu": args.gpu}
-    with Verifier(selector=args.selector, ensemble=not args.no_ensemble, ensemble_threshold=args.threshold,
+    ensemble = not args.no_ensemble and args.selector != "input"  # "input" never reconstructs
+    settings = {"selector": args.selector, "ensemble": ensemble, "threshold": args.threshold if ensemble else None,
+                "on_uncertain": args.on_uncertain, "judge_input": args.judge_input and args.selector != "input",
+                "vocabulary": args.vocabulary, "gpu": args.gpu}
+    with Verifier(selector=args.selector, ensemble=ensemble, ensemble_threshold=args.threshold,
                   on_uncertain=args.on_uncertain, vocabulary=args.vocabulary, gpu=args.gpu,
-                  log_dir=args.log_dir) as verifier:
+                  judge_input=settings["judge_input"], log_dir=args.log_dir) as verifier:
         server = VerifierServer(verifier, settings, args.host, args.port, args.log_dir)
         print(f"perception server on http://{args.host}:{server.server_port} {json.dumps(settings)}", flush=True)
         server.watch_workers()

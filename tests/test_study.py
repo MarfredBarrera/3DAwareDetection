@@ -59,11 +59,17 @@ class PerceptionSelectTests(unittest.TestCase):
         from perception import select
 
         self.assertEqual(select.top1({"a": 0.8, "b": 0.3, "c": 0.5}), ("a", 0.30000000000000004))
-        self.assertEqual(select.top2gap_pick({1: {"a": 0.9, "b": 0.8}, 2: {"a": 0.2, "b": 0.7}}), 2)
-        quality = {1: (0.9, 60.0), 2: (0.5, 30.0), 3: (0.7, 0.0)}
-        self.assertEqual(select.vqf_pick(quality), 3)  # 1 is above the 0-45 band
-        self.assertEqual(select.vqf_pick(quality, (50, 90)), 1)
-        self.assertEqual(select.vqf_pick({1: (0.2, 80.0), 2: (0.4, 70.0)}), 2)  # none in band: all compete
+        gaps = {1: {"a": 0.9, "b": 0.8}, 2: {"a": 0.2, "b": 0.7}, 3: {"a": 0.0, "b": 1.0}}
+        self.assertEqual(select.top2gap_pick(gaps, {1: 0.0, 2: 30.0, 3: -20.0}), 2)  # 3 looks up from below
+        self.assertEqual(select.top2gap_pick(gaps, {1: 0.0, 2: 30.0, 3: 60.0}), 3)  # views from above compete
+        self.assertEqual(select.top2gap_pick(gaps, {1: 0.0, 2: 30.0, 3: 60.0}, (0, 45)), 2)
+        self.assertEqual(select.top2gap_pick(gaps, {1: -30.0, 2: -20.0, 3: -10.0}), 3)  # none in band: all compete
+        quality = {1: (0.9, -15.0), 2: (0.5, 30.0), 3: (0.7, 60.0)}
+        self.assertEqual(select.vqf_pick(quality), 3)  # 1 looks up from below
+        self.assertEqual(select.vqf_pick(quality, (0, 45)), 2)
+        self.assertEqual(select.vqf_pick({1: (0.2, -20.0), 2: (0.4, -10.0)}), 2)  # none in band: all compete
+        self.assertEqual(select.competitors(["chair", "cushion", "table"], "couch"), ["chair", "table", "couch"])
+        self.assertEqual(select.competitors(["chair", "cushion"], "tv"), ["chair", "cushion", "tv"])
         self.assertTrue(select.trusted(0.1, 0.15))
         self.assertFalse(select.trusted(0.2, 0.15))
         self.assertFalse(select.trusted(None, 0.15))

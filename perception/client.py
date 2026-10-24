@@ -10,7 +10,9 @@
 Per call: SAM3D reconstructs the masked object; the ensemble filter (optional)
 measures stage-1 seed disagreement; a selector (``vqf`` or ``top2gap``) picks
 one candidate view; SAM3 scores the vocabulary on it; the detection is
-accepted when the top-1 category is the target. The models live in two
+accepted when the top-1 category is the target. Selector ``input`` skips SAM3D
+and judges the raw frame (no SAM3D worker is started); so does every flat target
+(``select.FLAT``, e.g. tv), whatever the selector. The models live in two
 persistent worker processes (see ``perception.worker``), loaded once.
 
 Workers start with ``launcher``: by default ``sam3d-env <env>`` inside the
@@ -26,6 +28,7 @@ from pathlib import Path
 
 from perception import select
 from perception.images import decode, encode
+from viewactive.grid import sam3d_to_viewactive
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 CONTAINER = os.environ.get("PERCEPTION_CONTAINER", "3dawareverification-dev-1")
@@ -43,8 +46,8 @@ class View:
     """One SAM3D candidate, angles relative to the input camera ((180, 0) = input view)."""
     azimuth: float
     elevation: float
+    absolute_elevation: float = None  # elevation in the gravity frame (selectors drop views from below, < 0)
     quality: float = None        # ViewActive VQF quality (vqf selector)
-    vqf_elevation: float = None  # absolute elevation (gravity frame) the quality refers to
     scores: dict = None          # SAM3 score per category, when this view was classified
     image: object = None         # PIL image, when rendered
 
@@ -60,17 +63,18 @@ class Verdict:
     trusted: bool = True         # passed the ensemble filter
     views: list = field(default_factory=list)  # every candidate considered
     timing: dict = None
+    input_scores: dict = None    # SAM3 scores on the raw frame, when ``judge_input`` also judged it
 
     def summary(self):
         """JSON-safe dict of the verdict; views without their images."""
         def view(v):
-            return {"azimuth": v.azimuth, "elevation": v.elevation, "quality": v.quality,
-                    "vqf_elevation": v.vqf_elevation, "scores": v.scores}
+            return {"azimuth": v.azimuth, "elevation": v.elevation, "absolute_elevation": v.absolute_elevation,
+                    "quality": v.quality, "scores": v.scores}
 
         return {"accepted": self.accepted, "label": self.label, "scores": dict(self.scores),
                 "judged": self.judged, "view": None if self.view is None else view(self.view),
                 "uncertainty": self.uncertainty, "trusted": self.trusted,
-                "views": [view(v) for v in self.views], "timing": self.timing}
+                "views": [view(v) for v in self.views], "timing": self.timing, "input_scores": self.input_scores}
 
 
 def default_launcher():
@@ -122,22 +126,26 @@ class _Worker:
 class Verifier:
     """Verify detections through SAM3D views; see the module docstring.
 
-    selector: "vqf" (learned ViewActive viewpoint quality; one rendered view) or
-        "top2gap" (SAM3's largest top-1 minus top-2 gap over all candidates).
+    selector: "vqf" (learned ViewActive viewpoint quality; one rendered view),
+        "top2gap" (SAM3's largest top-1 minus top-2 gap over all candidates) or
+        "input" (no SAM3D: SAM3 on the masked detection in the raw frame; ensemble ignored).
     ensemble: run the ensemble filter (``ensemble_seeds`` stage-1 seeds); a
         reconstruction is trusted when its disagreement <= ``ensemble_threshold``
         (0.10-0.20 keeps ~99% of useful reconstructions on 1,800 LVIS objects).
     on_uncertain: when not trusted, "input" classifies the raw frame, "reject"
         rejects the detection, "accept" keeps it unverified.
-    vocabulary: the closed set of categories SAM3 ranks; the target is added.
+    vocabulary: the closed set of categories SAM3 ranks; the target is added and its
+        parts (``select.PARTS``, e.g. "cushion" for "couch") are left out.
+    judge_input: the raw frame must also show the target: SAM3 judges it first and a
+        rejection there ends the call (no SAM3D); otherwise the view decides.
     all_views: render and classify every candidate, also of distrusted reconstructions
         (for evaluation and figures; slower).
     """
 
     def __init__(self, selector="vqf", ensemble=True, ensemble_threshold=0.15, ensemble_seeds=4,
-                 on_uncertain="input", vocabulary=HOUSEHOLD, gpu=0, all_views=False,
+                 on_uncertain="input", vocabulary=HOUSEHOLD, gpu=0, all_views=False, judge_input=False,
                  azimuths=(0, 45, 90, 135, 180, 225, 270, 315), elevations=(0, 30, 60),
-                 distance=2.0, resolution=320, seed=42, vqf_elevations=select.VQF_ELEVATIONS,
+                 distance=2.0, resolution=320, seed=42, elevation_range=select.VIEW_ELEVATIONS,
                  input_iou=0.3, sam3="/data/checkpoints/sam3/sam3.pt",
                  sam3d="/data/checkpoints/sam3d/hf", viewactive=VIEWACTIVE, launcher=None, log_dir=None):
         if selector not in select.SELECTORS:
@@ -147,12 +155,13 @@ class Verifier:
         if ensemble and ensemble_seeds < 2:
             raise ValueError("the ensemble filter needs ensemble_seeds >= 2")
         self.selector, self.on_uncertain, self.all_views = selector, on_uncertain, all_views
+        self.judge_input = judge_input
         self.threshold = ensemble_threshold if ensemble else None
         self.seeds = ensemble_seeds if ensemble else 1
         self.vocabulary = list(dict.fromkeys(vocabulary))
         self.grid = {"azimuths": [float(a) for a in azimuths], "elevations": [float(e) for e in elevations],
                      "distance": distance, "resolution": resolution, "seed": seed}
-        self.vqf_elevations, self.input_iou = tuple(vqf_elevations), input_iou
+        self.elevation_range, self.input_iou = tuple(elevation_range), input_iou
         launcher = launcher or default_launcher()
         log = (lambda name: Path(log_dir) / f"{name}.log") if log_dir else (lambda name: None)
         if log_dir:
@@ -160,11 +169,14 @@ class Verifier:
         common = ["--gpu", str(gpu)]
         self.sam3 = _Worker("core", ["--role", "sam3", "--sam3", sam3, *common], launcher, log("sam3"))
         uses_vqf = selector == "vqf" or all_views
-        self.sam3d = _Worker("sam3d", ["--role", "sam3d", "--sam3d", sam3d, *common]
-                             + (["--viewactive", str(viewactive)] if uses_vqf else []), launcher, log("sam3d"))
+        self.sam3d = None
+        if selector != "input" or all_views:
+            self.sam3d = _Worker("sam3d", ["--role", "sam3d", "--sam3d", sam3d, *common]
+                                 + (["--viewactive", str(viewactive)] if uses_vqf else []), launcher, log("sam3d"))
         try:
             self.sam3.wait_ready()  # Both load concurrently.
-            self.sam3d.wait_ready()
+            if self.sam3d:
+                self.sam3d.wait_ready()
         except Exception:
             self.close()
             raise
@@ -187,19 +199,31 @@ class Verifier:
         ``input_elevation``: camera elevation in degrees, positive looking down at
         the object (Habitat: -pitch). It levels the candidate views.
         """
-        vocabulary = list(dict.fromkeys([*(vocabulary or self.vocabulary), target]))
+        vocabulary = select.competitors(vocabulary or self.vocabulary, target)
+        if (self.selector == "input" or target in select.FLAT) and not self.all_views:
+            scores = self.classify(image, mask, vocabulary)
+            label = select.top1(scores)[0]
+            return Verdict(accepted=label == target, label=label, scores=scores, judged="input", trusted=True)
+        input_scores = None
+        if self.judge_input and not self.all_views:
+            input_scores = self.classify(image, mask, vocabulary)
+            label = select.top1(input_scores)[0]
+            if label != target:
+                return Verdict(accepted=False, label=label, scores=input_scores, judged="input",
+                               input_scores=input_scores)
         rgb, silhouette = encode(image), encode(mask, "L")
         angles = [(a, e) for e in self.grid["elevations"] for a in self.grid["azimuths"]]
-        views = {angle: View(*angle) for angle in angles}
+        views = {angle: View(*angle, absolute_elevation=sam3d_to_viewactive(*angle, input_elevation)[1])
+                 for angle in angles}
         if self.selector == "vqf" or self.all_views:
             quality = self.sam3d.call("vqf", image=rgb, mask=silhouette, input_elevation=input_elevation,
                                       angles=angles)
-            for angle, (value, elevation) in zip(angles, quality):
-                views[angle].quality, views[angle].vqf_elevation = value, elevation
+            for angle, (value, _) in zip(angles, quality):
+                views[angle].quality = value
         render = dict(self.grid)
         if self.selector == "vqf" and not self.all_views:
-            pick = select.vqf_pick({a: (v.quality, v.vqf_elevation) for a, v in views.items()},
-                                   self.vqf_elevations)
+            pick = select.vqf_pick({a: (v.quality, v.absolute_elevation) for a, v in views.items()},
+                                   self.elevation_range)
             render.update(azimuths=[pick[0]], elevations=[pick[1]])
         # Distrusted reconstructions are not rendered, unless every view was asked for.
         result = self.sam3d.call("reconstruct", image=rgb, mask=silhouette, input_elevation=input_elevation,
@@ -216,7 +240,8 @@ class Verifier:
             for view, value in zip(rendered, scores):
                 view.scores = value
         verdict = Verdict(accepted=False, label=None, scores={}, judged="none", uncertainty=uncertainty,
-                          trusted=trusted, views=list(views.values()), timing=result["timing"])
+                          trusted=trusted, views=list(views.values()), timing=result["timing"],
+                          input_scores=input_scores)
         if not trusted:
             if self.on_uncertain == "input":
                 verdict.scores, verdict.judged = self.classify(image, mask, vocabulary), "input"
@@ -225,10 +250,12 @@ class Verifier:
                 return verdict
         else:
             if self.selector == "top2gap":
-                key = select.top2gap_pick({(v.azimuth, v.elevation): v.scores for v in rendered})
+                key = select.top2gap_pick({(v.azimuth, v.elevation): v.scores for v in rendered},
+                                          {(v.azimuth, v.elevation): v.absolute_elevation for v in rendered},
+                                          self.elevation_range)
             else:
-                key = select.vqf_pick({(v.azimuth, v.elevation): (v.quality, v.vqf_elevation)
-                                       for v in rendered}, self.vqf_elevations)
+                key = select.vqf_pick({(v.azimuth, v.elevation): (v.quality, v.absolute_elevation)
+                                       for v in rendered}, self.elevation_range)
             verdict.view, verdict.judged = views[key], "view"
             if verdict.view.scores is None:
                 verdict.view.scores = self.sam3.call("classify", image=encode(verdict.view.image),
@@ -240,7 +267,7 @@ class Verifier:
 
     def alive(self):
         """{worker: True while its process runs}."""
-        return {"sam3": self.sam3.alive(), "sam3d": self.sam3d.alive()}
+        return {name: worker.alive() for name, worker in (("sam3", self.sam3), ("sam3d", self.sam3d)) if worker}
 
     def close(self):
         for worker in (getattr(self, "sam3", None), getattr(self, "sam3d", None)):

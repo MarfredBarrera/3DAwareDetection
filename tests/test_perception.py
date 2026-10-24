@@ -10,6 +10,7 @@ from unittest.mock import patch
 import numpy as np
 
 from perception import client
+from perception import select as perception_select
 from perception.images import encode
 
 IMAGE = np.full((8, 8, 3), 200, dtype=np.uint8)
@@ -62,6 +63,10 @@ class FakeWorker:
         return VIEW_SCORES[(float(np.asarray(decode(image))[0, 0, 0]), 0.0)]
 
 
+def select_top1(scores):
+    return perception_select.top1(scores)[0]
+
+
 class VerifierTests(unittest.TestCase):
     def verifier(self, uncertainty=0.05, **settings):
         FakeWorker.uncertainty = uncertainty
@@ -76,6 +81,32 @@ class VerifierTests(unittest.TestCase):
         verdict = verifier.verify(IMAGE, MASK, "table")
         self.assertEqual((verdict.view.azimuth, verdict.label, verdict.accepted), (90.0, "table", True))
         self.assertEqual(verifier.sam3d.rendered, [[(90.0, 0.0)]])  # only the VQF pick is rendered
+
+    def test_input_selector_skips_sam3d(self):
+        verifier = self.verifier(selector="input")
+        verdict = verifier.verify(IMAGE, MASK, "table")
+        self.assertIsNone(verifier.sam3d)
+        self.assertEqual((verdict.judged, verdict.label, verdict.accepted, verdict.views), ("input", "table", True, []))
+        self.assertEqual(verifier.alive(), {"sam3": True})
+
+    def test_flat_target_skips_sam3d(self):
+        verifier = self.verifier(selector="top2gap")
+        with patch.object(perception_select, "FLAT", ("table",)):
+            verdict = verifier.verify(IMAGE, MASK, "table")
+        self.assertEqual((verdict.judged, verdict.label, verdict.views), ("input", "table", []))
+        self.assertEqual(verifier.sam3d.rendered, [])
+
+    def test_judge_input(self):
+        # The masked raw frame reads "table" (FakeWorker).
+        verifier = self.verifier(selector="vqf", judge_input=True)
+        verdict = verifier.verify(IMAGE, MASK, "chair")
+        self.assertEqual((verdict.judged, verdict.label, verdict.accepted), ("input", "table", False))
+        self.assertEqual(verifier.sam3d.rendered, [])  # rejected before SAM3D
+        verdict = verifier.verify(IMAGE, MASK, "table")
+        self.assertEqual((verdict.judged, verdict.label, verdict.accepted), ("view", "table", True))
+        self.assertEqual(select_top1(verdict.input_scores), "table")
+        verdict = self.verifier(selector="top2gap", judge_input=True).verify(IMAGE, MASK, "table")
+        self.assertEqual((verdict.judged, verdict.label, verdict.accepted), ("view", "table", True))
 
     def test_ensemble_filter(self):
         trusted = self.verifier(selector="vqf").verify(IMAGE, MASK, "table")
@@ -131,7 +162,7 @@ class ServerTests(unittest.TestCase):
 
     def request(self, **fields):
         return {"protocol": self.server_module.PROTOCOL, "request_id": "r1", "image": encode(IMAGE),
-                "mask": encode(MASK, "L"), "target": "table", "input_elevation": 10.0, **fields}
+                "mask": encode(MASK, "L"), "target": "table", "input_elevation": 0.0, **fields}
 
     def test_health(self):
         status, reply = self.call("/health")
@@ -147,6 +178,11 @@ class ServerTests(unittest.TestCase):
         self.assertIsNotNone(reply["view_image"])
         status, reply = self.call("/verify", self.request(target="chair"))
         self.assertEqual((status, reply["verdict"]["accepted"], reply["verdict"]["label"]), (200, False, "table"))
+        # Looking down at 20 deg puts the rear candidate (0, 0) at -20 deg absolute, outside the
+        # band (no views from below), so top2gap falls back to the chair-like input view (180, 0).
+        status, reply = self.call("/verify", self.request(input_elevation=20.0))
+        self.assertEqual((reply["verdict"]["view"]["azimuth"], reply["verdict"]["view"]["absolute_elevation"],
+                          reply["verdict"]["label"]), (180.0, 20.0, "chair"))
 
     def test_dead_worker(self):
         self.verifier.sam3d.role = "dead"
@@ -179,8 +215,8 @@ class ServerTests(unittest.TestCase):
     def test_summary_is_json_safe(self):
         verdict = self.verifier.verify(IMAGE, MASK, "table")
         summary = json.loads(json.dumps(verdict.summary()))
-        self.assertEqual(summary["view"], {"azimuth": 0.0, "elevation": 0.0, "quality": None,
-                                           "vqf_elevation": None, "scores": {"chair": 0.1, "table": 0.9}})
+        self.assertEqual(summary["view"], {"azimuth": 0.0, "elevation": 0.0, "absolute_elevation": 0.0,
+                                           "quality": None, "scores": {"chair": 0.1, "table": 0.9}})
         self.assertNotIn("image", summary["views"][0])
 
 
