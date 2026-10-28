@@ -34,7 +34,26 @@ PARTS = {"couch": ("cushion",), "chair": ("cushion",), "bed": ("cushion",)}
 # Targets that are essentially flat: their category is in surface appearance and
 # context, not 3D shape, so a SAM3D view cannot help (a framed picture and a TV are the
 # same thin rectangle). They are judged on the raw frame only.
-FLAT = ("tv", "picture", "painting", "poster", "mirror", "window", "whiteboard")
+FLAT = ("tv", "picture", "painting", "poster", "mirror", "window", "whiteboard", "rug", "carpet", "calendar",
+        "blinds")
+# Open-vocabulary names (HM3D-OVON) that denote the same object as a vocabulary entry: a
+# target never competes with its own synonyms or broader names (an OVON "pillow" against
+# the vocabulary's "cushion"). Symmetric; chosen from category semantics, not from results.
+ALIASES = {
+    "cushion": ("pillow",),
+    "picture": ("photo", "photo mount"),
+    "potted plant": ("flowerpot", "decorative plant"),
+    "chest of drawers": ("dresser", "nightstand"),
+    "cabinet": ("nightstand",),
+    "table": ("nightstand",),
+    "counter": ("island",),
+    "window": ("window glass",),
+    "shower": ("shower glass",),
+    "stool": ("ottoman", "footrest", "footstool"),
+    "bed": ("bedframe",),
+    "exercise equipment": ("exercise bike",),
+    "appliance": ("refrigerator", "freezer", "microwave", "dishwasher", "coffee machine", "boiler"),
+}
 # Categories a target is easily mistaken for (and vice versa). A raw-frame accept whose
 # runner-up is one of these is unsure. Chosen from category semantics, not from results.
 CONFUSABLE = {"chair": ("stool", "couch", "exercise equipment"), "couch": ("chair", "bed"),
@@ -44,9 +63,25 @@ CONFUSABLE = {"chair": ("stool", "couch", "exercise equipment"), "couch": ("chai
 UNSURE_MARGIN = 0.3
 
 
+def same_object(a, b):
+    """True when names ``a`` and ``b`` denote the same object: equal, one is the other's
+    head noun as whole trailing words ("potted plant" and "plant", not "tv stand" and
+    "tv"), or an alias (``ALIASES``). Case-insensitive."""
+    a, b = a.lower().strip(), b.lower().strip()
+    return (a == b or a.endswith(" " + b) or b.endswith(" " + a)
+            or b in ALIASES.get(a, ()) or a in ALIASES.get(b, ()))
+
+
 def competitors(vocabulary, target):
-    """``vocabulary`` (with ``target``) without the target's parts (``PARTS``)."""
-    return [c for c in dict.fromkeys([*vocabulary, target]) if c not in PARTS.get(target, ())]
+    """``vocabulary`` (with ``target``) without the target's parts (``PARTS``) and
+    other names of the same object (``same_object``)."""
+    return [c for c in dict.fromkeys([*vocabulary, target])
+            if c == target or (c not in PARTS.get(target, ()) and not same_object(c, target))]
+
+
+def flat(target):
+    """True for flat targets (``FLAT``, or another name of one), judged on the raw frame only."""
+    return any(same_object(f, target) for f in FLAT)
 
 
 def ranked(scores):

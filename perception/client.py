@@ -12,7 +12,7 @@ measures stage-1 seed disagreement; a selector (``vqf`` or ``top2gap``) picks
 one candidate view; SAM3 scores the vocabulary on it; the detection is
 accepted when the top-1 category is the target. Selector ``input`` skips SAM3D
 and judges the raw frame (no SAM3D worker is started); so does every flat target
-(``select.FLAT``, e.g. tv), whatever the selector. The models live in two
+(``select.flat``, e.g. tv), whatever the selector. The models live in two
 persistent worker processes (see ``perception.worker``), loaded once.
 
 Workers start with ``launcher``: by default ``sam3d-env <env>`` inside the
@@ -136,7 +136,8 @@ class Verifier:
     on_uncertain: when not trusted, "input" classifies the raw frame, "reject"
         rejects the detection, "accept" keeps it unverified.
     vocabulary: the closed set of categories SAM3 ranks; the target is added and its
-        parts (``select.PARTS``, e.g. "cushion" for "couch") are left out.
+        parts (``select.PARTS``, e.g. "cushion" for "couch") and other names of it
+        (``select.same_object``, e.g. "cushion" for "pillow") are left out.
     judge_input: the raw frame must also show the target: SAM3 judges it first and a
         rejection there ends the call (no SAM3D); otherwise the view decides.
     view_when: with ``judge_input``, "always" sends every raw accept to a SAM3D view;
@@ -212,7 +213,7 @@ class Verifier:
             return Verdict(accepted=accepted, label=target if accepted else None, scores=scores, judged="input",
                            trusted=True)
         vocabulary = select.competitors(vocabulary or self.vocabulary, target)
-        if (self.selector == "input" or target in select.FLAT) and not self.all_views:
+        if (self.selector == "input" or select.flat(target)) and not self.all_views:
             scores = self.classify(image, mask, vocabulary)
             label = select.top1(scores)[0]
             return Verdict(accepted=label == target, label=label, scores=scores, judged="input", trusted=True)

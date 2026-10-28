@@ -156,6 +156,33 @@ class VerifierTests(unittest.TestCase):
                 self.verifier(**bad)
 
 
+class SelectRulesTests(unittest.TestCase):
+    def test_hm3d_rules_unchanged(self):
+        """The open-vocabulary rules leave ApexNav's six HM3D-v2 goals as before."""
+        for target in ("chair", "couch", "bed", "toilet", "tv", "potted plant"):
+            parts_only = [c for c in dict.fromkeys([*client.HOUSEHOLD, target])
+                          if c not in perception_select.PARTS.get(target, ())]
+            self.assertEqual(perception_select.competitors(client.HOUSEHOLD, target), parts_only, target)
+            self.assertEqual(perception_select.flat(target), target == "tv", target)
+
+    def test_open_vocabulary_competitors(self):
+        def lacks(target, name):
+            return name not in perception_select.competitors(client.HOUSEHOLD, target)
+        self.assertTrue(lacks("pillow", "cushion"))
+        self.assertTrue(lacks("refrigerator", "appliance"))
+        self.assertTrue(lacks("plant", "potted plant"))
+        self.assertTrue(lacks("footstool", "stool"))
+        self.assertTrue(lacks("nightstand", "table") and lacks("nightstand", "cabinet"))
+        self.assertFalse(lacks("vase", "potted plant"))
+        self.assertFalse(lacks("tv stand", "tv"))
+        self.assertFalse(perception_select.same_object("bathtub", "tub"))  # whole words only
+        self.assertIn("pillow", perception_select.competitors(client.HOUSEHOLD, "pillow"))
+        for target in ("photo", "window glass", "rug", "photo mount", "calendar"):
+            self.assertTrue(perception_select.flat(target), target)
+        for target in ("sideboard", "tv stand", "pillow"):
+            self.assertFalse(perception_select.flat(target), target)
+
+
 class ServerTests(unittest.TestCase):
     """perception.server round trips against a Verifier with fake workers."""
 

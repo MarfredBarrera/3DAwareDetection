@@ -159,7 +159,7 @@ def outcomes(episode, target, lam=LAMBDA):
     views = {(v["azimuth"], v["elevation"]): v for v in episode["views"]}
     scores = {key: keep(v["scores"]) for key, v in views.items()}
     rejects = lambda key: select.top1(scores[key])[0] != target
-    if target in select.FLAT:  # judged on the raw frame only (perception.Verifier skips SAM3D)
+    if select.flat(target):  # judged on the raw frame only (perception.Verifier skips SAM3D)
         rejects = lambda key: select.top1(keep(episode["input"]))[0] != target
     gap = select.top2gap_pick(scores, {key: v["absolute_elevation"] for key, v in views.items()})
     vqf = select.vqf_pick({key: (v["quality"], v["absolute_elevation"]) for key, v in views.items()})
