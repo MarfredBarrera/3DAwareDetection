@@ -163,6 +163,9 @@ def serve(argv):
     parser.add_argument("--threshold", type=float, default=0.15, help="ensemble disagreement threshold")
     parser.add_argument("--judge-input", action="store_true",
                         help="the raw frame must also show the target (rejects before SAM3D)")
+    parser.add_argument("--view-when", choices=("always", "unsure"), default="always",
+                        help="with --judge-input: which raw accepts get a SAM3D view")
+    parser.add_argument("--unsure-margin", type=float, default=select.UNSURE_MARGIN)
     parser.add_argument("--on-uncertain", choices=select.ON_UNCERTAIN, default="input")
     parser.add_argument("--vocabulary", nargs="+", default=list(HOUSEHOLD),
                         help="default vocabulary (a request may send its own)")
@@ -170,13 +173,16 @@ def serve(argv):
     args = parser.parse_args(argv)
 
     args.log_dir.mkdir(parents=True, exist_ok=True)
-    ensemble = not args.no_ensemble and args.selector != "input"  # "input" never reconstructs
+    raw = args.selector in ("input", "naive")  # these never reconstruct
+    ensemble = not args.no_ensemble and not raw
     settings = {"selector": args.selector, "ensemble": ensemble, "threshold": args.threshold if ensemble else None,
-                "on_uncertain": args.on_uncertain, "judge_input": args.judge_input and args.selector != "input",
+                "on_uncertain": args.on_uncertain, "judge_input": args.judge_input and not raw,
+                "view_when": args.view_when, "unsure_margin": args.unsure_margin,
                 "vocabulary": args.vocabulary, "gpu": args.gpu}
     with Verifier(selector=args.selector, ensemble=ensemble, ensemble_threshold=args.threshold,
                   on_uncertain=args.on_uncertain, vocabulary=args.vocabulary, gpu=args.gpu,
-                  judge_input=settings["judge_input"], log_dir=args.log_dir) as verifier:
+                  judge_input=settings["judge_input"], view_when=args.view_when,
+                  unsure_margin=args.unsure_margin, log_dir=args.log_dir) as verifier:
         server = VerifierServer(verifier, settings, args.host, args.port, args.log_dir)
         print(f"perception server on http://{args.host}:{server.server_port} {json.dumps(settings)}", flush=True)
         server.watch_workers()

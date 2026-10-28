@@ -128,7 +128,8 @@ class Verifier:
 
     selector: "vqf" (learned ViewActive viewpoint quality; one rendered view),
         "top2gap" (SAM3's largest top-1 minus top-2 gap over all candidates) or
-        "input" (no SAM3D: SAM3 on the masked detection in the raw frame; ensemble ignored).
+        "input" (no SAM3D: SAM3 on the masked detection in the raw frame; ensemble ignored) or
+        "naive" (no SAM3D: the target prompt alone, accepted iff its score >= select.NAIVE_THRESHOLD).
     ensemble: run the ensemble filter (``ensemble_seeds`` stage-1 seeds); a
         reconstruction is trusted when its disagreement <= ``ensemble_threshold``
         (0.10-0.20 keeps ~99% of useful reconstructions on 1,800 LVIS objects).
@@ -138,12 +139,16 @@ class Verifier:
         parts (``select.PARTS``, e.g. "cushion" for "couch") are left out.
     judge_input: the raw frame must also show the target: SAM3 judges it first and a
         rejection there ends the call (no SAM3D); otherwise the view decides.
+    view_when: with ``judge_input``, "always" sends every raw accept to a SAM3D view;
+        "unsure" only raw accepts that ``select.unsure`` flags (margin < ``unsure_margin``
+        or a confusable runner-up); a sure raw accept is returned as judged "input".
     all_views: render and classify every candidate, also of distrusted reconstructions
         (for evaluation and figures; slower).
     """
 
     def __init__(self, selector="vqf", ensemble=True, ensemble_threshold=0.15, ensemble_seeds=4,
                  on_uncertain="input", vocabulary=HOUSEHOLD, gpu=0, all_views=False, judge_input=False,
+                 view_when="always", unsure_margin=select.UNSURE_MARGIN,
                  azimuths=(0, 45, 90, 135, 180, 225, 270, 315), elevations=(0, 30, 60),
                  distance=2.0, resolution=320, seed=42, elevation_range=select.VIEW_ELEVATIONS,
                  input_iou=0.3, sam3="/data/checkpoints/sam3/sam3.pt",
@@ -152,10 +157,12 @@ class Verifier:
             raise ValueError(f"selector must be one of {select.SELECTORS}")
         if on_uncertain not in select.ON_UNCERTAIN:
             raise ValueError(f"on_uncertain must be one of {select.ON_UNCERTAIN}")
+        if view_when not in ("always", "unsure"):
+            raise ValueError('view_when must be "always" or "unsure"')
         if ensemble and ensemble_seeds < 2:
             raise ValueError("the ensemble filter needs ensemble_seeds >= 2")
         self.selector, self.on_uncertain, self.all_views = selector, on_uncertain, all_views
-        self.judge_input = judge_input
+        self.judge_input, self.view_when, self.unsure_margin = judge_input, view_when, unsure_margin
         self.threshold = ensemble_threshold if ensemble else None
         self.seeds = ensemble_seeds if ensemble else 1
         self.vocabulary = list(dict.fromkeys(vocabulary))
@@ -170,7 +177,7 @@ class Verifier:
         self.sam3 = _Worker("core", ["--role", "sam3", "--sam3", sam3, *common], launcher, log("sam3"))
         uses_vqf = selector == "vqf" or all_views
         self.sam3d = None
-        if selector != "input" or all_views:
+        if selector not in ("input", "naive") or all_views:
             self.sam3d = _Worker("sam3d", ["--role", "sam3d", "--sam3d", sam3d, *common]
                                  + (["--viewactive", str(viewactive)] if uses_vqf else []), launcher, log("sam3d"))
         try:
@@ -199,6 +206,11 @@ class Verifier:
         ``input_elevation``: camera elevation in degrees, positive looking down at
         the object (Habitat: -pitch). It levels the candidate views.
         """
+        if self.selector == "naive" and not self.all_views:
+            scores = self.classify(image, mask, [target])
+            accepted = scores.get(target, 0.0) >= select.NAIVE_THRESHOLD
+            return Verdict(accepted=accepted, label=target if accepted else None, scores=scores, judged="input",
+                           trusted=True)
         vocabulary = select.competitors(vocabulary or self.vocabulary, target)
         if (self.selector == "input" or target in select.FLAT) and not self.all_views:
             scores = self.classify(image, mask, vocabulary)
@@ -210,6 +222,9 @@ class Verifier:
             label = select.top1(input_scores)[0]
             if label != target:
                 return Verdict(accepted=False, label=label, scores=input_scores, judged="input",
+                               input_scores=input_scores)
+            if self.view_when == "unsure" and not select.unsure(input_scores, target, self.unsure_margin):
+                return Verdict(accepted=True, label=label, scores=input_scores, judged="input",
                                input_scores=input_scores)
         rgb, silhouette = encode(image), encode(mask, "L")
         angles = [(a, e) for e in self.grid["elevations"] for a in self.grid["azimuths"]]

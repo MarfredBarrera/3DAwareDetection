@@ -10,13 +10,18 @@ input camera; (180, 0) re-renders the input view.
 - ``input``: no SAM3D view; SAM3 judges the masked detection on the raw frame
   (the 2D control).
 
+``unsure``: whether a raw-frame accept is close enough to call to need a SAM3D view.
+
 Both pick only among candidates whose absolute elevation (gravity frame) is in
 ``elevation_range`` (default ``VIEW_ELEVATIONS``: at or above the object, never from
 below the floor plane), if any are. ViewActive was trained on 0-45, so VQF
 qualities above 45 are extrapolated.
 """
 
-SELECTORS = ("vqf", "top2gap", "input")
+SELECTORS = ("vqf", "top2gap", "input", "naive")
+# "naive": the target prompt alone on the raw frame, accepted iff its score >= NAIVE_THRESHOLD
+# (SAM3's default detection threshold); the baseline for the closed-vocabulary "input".
+NAIVE_THRESHOLD = 0.5
 # What to do when the ensemble filter distrusts a reconstruction:
 # "input" classifies the raw frame instead, "reject" abstains (rejects the
 # detection), "accept" keeps the detection unverified.
@@ -30,6 +35,13 @@ PARTS = {"couch": ("cushion",), "chair": ("cushion",), "bed": ("cushion",)}
 # context, not 3D shape, so a SAM3D view cannot help (a framed picture and a TV are the
 # same thin rectangle). They are judged on the raw frame only.
 FLAT = ("tv", "picture", "painting", "poster", "mirror", "window", "whiteboard")
+# Categories a target is easily mistaken for (and vice versa). A raw-frame accept whose
+# runner-up is one of these is unsure. Chosen from category semantics, not from results.
+CONFUSABLE = {"chair": ("stool", "couch", "exercise equipment"), "couch": ("chair", "bed"),
+              "bed": ("couch",), "toilet": ("sink", "bathtub")}
+# A raw-frame accept with a smaller top-1 minus top-2 gap is unsure
+# (outputs/apexnav_offline/defer_replay_2026-10-26: 0.2-0.5 behave alike).
+UNSURE_MARGIN = 0.3
 
 
 def competitors(vocabulary, target):
@@ -46,6 +58,15 @@ def top1(scores):
     """(top-1 category, its score minus the second score); gap is 0 for one category."""
     order = ranked(scores)
     return order[0][0], order[0][1] - (order[1][1] if len(order) > 1 else 0.0)
+
+
+def unsure(scores, target, margin=UNSURE_MARGIN):
+    """True when the target is top-1 in ``scores`` but by less than ``margin``, or the
+    runner-up is one of its confusables (``CONFUSABLE``)."""
+    order = ranked(scores)
+    if len(order) < 2:
+        return False
+    return order[0][1] - order[1][1] < margin or order[1][0] in CONFUSABLE.get(target, ())
 
 
 def in_band(elevations, elevation_range=VIEW_ELEVATIONS):

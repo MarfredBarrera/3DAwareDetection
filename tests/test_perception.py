@@ -89,6 +89,13 @@ class VerifierTests(unittest.TestCase):
         self.assertEqual((verdict.judged, verdict.label, verdict.accepted, verdict.views), ("input", "table", True, []))
         self.assertEqual(verifier.alive(), {"sam3": True})
 
+    def test_naive_selector(self):
+        verifier = self.verifier(selector="naive")
+        self.assertIsNone(verifier.sam3d)
+        self.assertTrue(verifier.verify(IMAGE, MASK, "table").accepted)  # table 0.7 >= 0.5
+        verdict = verifier.verify(IMAGE, MASK, "chair")  # chair 0.2 < 0.5, whatever the other scores
+        self.assertEqual((verdict.judged, verdict.label, verdict.accepted), ("input", None, False))
+
     def test_flat_target_skips_sam3d(self):
         verifier = self.verifier(selector="top2gap")
         with patch.object(perception_select, "FLAT", ("table",)):
@@ -107,6 +114,23 @@ class VerifierTests(unittest.TestCase):
         self.assertEqual(select_top1(verdict.input_scores), "table")
         verdict = self.verifier(selector="top2gap", judge_input=True).verify(IMAGE, MASK, "table")
         self.assertEqual((verdict.judged, verdict.label, verdict.accepted), ("view", "table", True))
+
+    def test_view_when_unsure(self):
+        # The masked raw frame reads table 0.7, chair 0.2: a gap of 0.5.
+        verifier = self.verifier(selector="top2gap", judge_input=True, view_when="unsure")
+        verdict = verifier.verify(IMAGE, MASK, "table")
+        self.assertEqual((verdict.judged, verdict.label, verdict.accepted), ("input", "table", True))
+        self.assertEqual(verifier.sam3d.rendered, [])  # a sure raw accept needs no view
+        verifier = self.verifier(selector="top2gap", judge_input=True, view_when="unsure", unsure_margin=0.6)
+        self.assertEqual(verifier.verify(IMAGE, MASK, "table").judged, "view")
+        with patch.dict(perception_select.CONFUSABLE, {"table": ("chair",)}):
+            verifier = self.verifier(selector="top2gap", judge_input=True, view_when="unsure")
+            self.assertEqual(verifier.verify(IMAGE, MASK, "table").judged, "view")
+
+    def test_unsure(self):
+        self.assertFalse(perception_select.unsure({"table": 0.7, "chair": 0.2}, "table"))
+        self.assertTrue(perception_select.unsure({"table": 0.5, "chair": 0.3}, "table"))
+        self.assertTrue(perception_select.unsure({"couch": 0.9, "chair": 0.1}, "couch"))
 
     def test_ensemble_filter(self):
         trusted = self.verifier(selector="vqf").verify(IMAGE, MASK, "table")
