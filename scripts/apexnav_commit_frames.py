@@ -36,6 +36,11 @@ for mode, root in runs.items():
         record = records[0]
         meta = json.load(open(f"{record}/meta.json"))
         steps = [json.loads(line) for line in open(f"{record}/steps.jsonl")]
+        if not steps:
+            summary[f"{mode}_{e}"] = {"result": meta["result"], "target": meta["target_label"], "record": record,
+                                     "final_step": None, "evidence_step": None, "distance_to_goal": meta["distance_to_goal"]}
+            print(mode, e, "no steps")
+            continue
         evidence = find_commit_evidence(record, steps)
         last = steps[-1]["step"]
         info = {"result": meta["result"], "target": meta["target_label"], "scene": meta["scene"],

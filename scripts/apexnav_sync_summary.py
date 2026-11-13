@@ -20,6 +20,9 @@ import sys
 
 import numpy as np
 
+D1_COUNTS = ("approach_arrived", "approach_early", "approach_accepted", "approach_rejected",
+             "approach_insufficient", "approach_exhausted", "approach_steps", "sam3_decisions", "qwen_decisions")
+
 out, sample_file = sys.argv[1], sys.argv[2]
 runs = dict(arg.split("=", 1) for arg in sys.argv[3:])
 os.makedirs(out, exist_ok=True)
@@ -63,6 +66,8 @@ for name, root in runs.items():
             "insufficient": v.get("insufficient", 0), "moves": v.get("moves", 0),
             "unreachable": v.get("unreachable", 0), "aborted": v.get("aborted", 0),
             "not_redetected": v.get("not_redetected", 0), "fallback": v.get("fallback", 0),
+            # d1 (approach-and-reverify): who decided and how approaches ended
+            **{k: v.get(k, 0) for k in D1_COUNTS},
             # ground truth of the judged evidence view (semantic mask overlap with a goal object)
             "reject_goal": sum(s == -1 and g is True for s, g in zip(states, gt)),
             "reject_nongoal": sum(s == -1 and g is False for s, g in zip(states, gt)),
@@ -99,7 +104,7 @@ for s in runs:
             entry[f"{key}_diff_ci95"] = [float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))]
     for key in ("requests", "accepted", "rejected", "errors", "no_evidence", "cached", "reopened",
                 "reject_goal", "reject_nongoal", "accept_goal", "accept_nongoal", "insufficient", "moves",
-                "unreachable", "aborted", "not_redetected", "fallback", "count_steps"):
+                "unreachable", "aborted", "not_redetected", "fallback", *D1_COUNTS, "count_steps"):
         entry[key] = float(metric(s, key).sum()) if key != "count_steps" else float(metric(s, key).mean())
     entry["minutes_per_episode"] = float(np.mean([by[(s, n)]["elapsed_s"] or 0 for n in common]) / 60)
     if s != "baseline" and "baseline" in runs:
