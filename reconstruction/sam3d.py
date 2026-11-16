@@ -17,7 +17,12 @@ def _synchronize_cuda():
 class SAM3D:
     """Load SAM 3D Objects once; reconstruct masked objects and render candidate views."""
 
-    def __init__(self, checkpoint_dir="/data/checkpoints/sam3d/hf"):
+    def __init__(self, checkpoint_dir="/data/checkpoints/sam3d/hf", gaussian_only=False):
+        """``gaussian_only``: decode only the Gaussians the renders use. Skips the mesh
+        decoder and the GLB built from its output, and frees the mesh and ``gaussian_4``
+        decoder weights (GPU memory for selector d1). The layout post-optimization that
+        would need the mesh is not configured in pipeline.yaml, so poses and renders are
+        unchanged; ``save_mesh`` is unavailable."""
         import torch
 
         config = Path(checkpoint_dir) / "pipeline.yaml"
@@ -51,6 +56,32 @@ class SAM3D:
         self._make_scene = make_scene
         self._prepare_gaussian = ready_gaussian_for_video_rendering
         self.last_timing = self.last_ensemble = None
+        self.gaussian_only = gaussian_only
+        if gaussian_only:
+            _gaussian_only(self._inference._pipeline)
+            torch.cuda.empty_cache()
+
+    def offload(self):
+        """Move every weight and tensor the pipeline keeps between requests to CPU and free the
+        GPU cache, so another model can use the memory (selector d1 staggers SAM3D and Qwen
+        on one GPU). ``onload`` moves them back; renders are unchanged."""
+        import torch
+
+        self._move("cpu")
+        torch.cuda.empty_cache()
+
+    def onload(self):
+        self._move("cuda")
+
+    def _move(self, device):
+        for _, owner, key in _gpu_state(self):
+            value = owner[key] if isinstance(owner, dict) else getattr(owner, key)
+            if hasattr(value, "parameters"):  # nn.Module: moved in place
+                value.to(device)
+            elif isinstance(owner, dict):
+                owner[key] = value.to(device)
+            else:
+                setattr(owner, key, value.to(device))
 
     def _load_input(self, rgb, mask):
         """RGB image and boolean mask; also sets FastSAM3D's mask frequency ratio."""
@@ -88,6 +119,8 @@ class SAM3D:
 
         from reconstruction import stage1_uncertainty as stage1
 
+        if save_mesh and self.gaussian_only:
+            raise ValueError("save_mesh needs the mesh decoder (SAM3D(gaussian_only=False))")
         image, mask = self._load_input(rgb, mask)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -127,6 +160,61 @@ class SAM3D:
                                       up=sam3d_gravity(input_elevation))
         timing["render_seconds"] = perf_counter() - started
         return candidates
+
+
+def _gpu_state(sam3d):
+    """(name, owner, key) of each nn.Module or tensor held by the pipeline, its attributes and
+    their dicts (two levels: models, condition_embedders, depth_model, slat_mean/std)."""
+    import torch
+
+    found, seen = [], set()
+
+    def visit(name, owner, key, depth):
+        value = owner[key] if isinstance(owner, dict) else getattr(owner, key)
+        if id(value) in seen:
+            return
+        seen.add(id(value))
+        if isinstance(value, (torch.nn.Module, torch.Tensor)):
+            found.append((name, owner, key))
+        elif depth and isinstance(value, dict):
+            for k in list(value):
+                visit(f"{name}.{k}", value, k, depth - 1)
+        elif depth and hasattr(value, "__dict__") and not isinstance(value, type):
+            for k in list(vars(value)):
+                visit(f"{name}.{k}", value, k, depth - 1)
+
+    visit("pipeline", sam3d._inference, "_pipeline", 2)
+    return found
+
+
+class _NoMesh:
+    """Stands in for the skipped mesh where FastSAM3D's run() counts its vertices and faces."""
+    vertices = faces = ()
+
+
+def _gaussian_only(pipeline):
+    """Make ``pipeline`` decode Gaussians only (see ``SAM3D(gaussian_only=True)``)."""
+    if getattr(pipeline, "layout_post_optimization_method", None) is not None:
+        raise RuntimeError("layout post-optimization needs the mesh; gaussian_only would change poses")
+    pipeline.decode_formats = ["gaussian"]
+    postprocess = pipeline.postprocess_slat_output
+
+    def decode_slat(map, slat, formats=("gaussian",)):
+        # The Gaussian branch of FastSAM3D's decode_slat (whose log line needs the mesh timing).
+        import torch
+        with torch.no_grad():
+            outputs = {"gaussian": pipeline.models["slat_decoder_gs"](slat)}
+        outputs["mesh"] = [_NoMesh()]  # run() reads its size unconditionally
+        return outputs
+
+    def postprocess_slat_output(outputs, *args, **kwargs):
+        outputs.pop("mesh", None)      # no mesh -> no GLB
+        return postprocess(outputs, *args, **kwargs)
+
+    pipeline.decode_slat, pipeline.postprocess_slat_output = decode_slat, postprocess_slat_output
+    for name in ("slat_decoder_mesh", "slat_decoder_gs_4"):
+        if name in pipeline.models:
+            del pipeline.models[name]
 
 
 def _save_render_mesh(output, scene_gaussian, output_dir):

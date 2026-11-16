@@ -42,7 +42,7 @@ The ViewActive model is trained here, not downloaded. The pipeline expects it at
 ```python
 from perception import Verifier
 
-with Verifier(selector="vqf",              # or "top2gap"
+with Verifier(selector="vqf",              # or "top2gap"; "input" = SAM3 on the raw frame, no SAM3D
               ensemble=True,               # the ensemble filter; False turns it off
               ensemble_threshold=0.15,
               on_uncertain="input",        # distrusted: classify the raw frame ("reject", "accept")
@@ -77,6 +77,33 @@ sam3d-env core python -m perception --image frame.png --target chair --elevation
 sam3d-env core python -m perception --image frame.png --mask mask.png --target chair \
     --selector top2gap --no-ensemble
 ```
+
+### As an HTTP service (ApexNav)
+
+A planner that cannot import our envs (ApexNav runs ROS 2 Jazzy + Habitat in its
+own container) calls `perception.server`: one `Verifier` with fixed settings,
+one request at a time. Check `nvidia-smi` and pick an idle GPU first.
+
+```bash
+sam3d-env core python -m perception.server --host 0.0.0.0 --port 8770 --gpu 0 \
+    --selector vqf --threshold 0.15 --on-uncertain input --log-dir outputs/apexnav_gate/server
+sam3d-env core python -m perception.server ping http://localhost:8770
+sam3d-env core python -m perception.server verify http://localhost:8770 \
+    --image frame.jpg --mask mask.png --target tv --elevation 30
+```
+
+- `GET /health` returns `{ok, protocol, settings, workers}` (503 once a model worker
+  died; the server then exits with status 1); `POST /verify` takes
+  `{protocol, request_id, image, mask, target, input_elevation, vocabulary?}`
+  (base64 images) and returns `{ok, verdict, view_image}`, where `verdict` is
+  `Verdict.summary()`. Malformed requests get a 400, verifier failures a 500,
+  both with `{ok: false, error}`. `requests.jsonl` in `--log-dir` logs each one.
+- ApexNav reaches the dev container over its compose network:
+  `docker network connect 3dawareverification_default apexnav`, then
+  `http://3dawareverification-dev-1:8770`. ApexNav's `perception_gate/` package
+  holds the client and the gate (branch `perception-gate`; enable with
+  `VERIFICATION_GATE=true ./scripts/start_session.sh` and
+  `verification.enabled=true`). See `docs/apexnav_integration_plan.md`.
 
 ### ApexNav false positives
 
@@ -168,7 +195,8 @@ in the container. Methods, deviations and results: [docs/viewactive.md](docs/vie
 
 ## Code
 
-- `perception/`: the pipeline (`Verifier`), its model workers and the selection rules.
+- `perception/`: the pipeline (`Verifier`), its model workers, the selection rules and the
+  HTTP server (`perception.server`).
 - `reconstruction/`: SAM3 and SAM3D wrappers, the stage-1 ensemble, mesh error.
 - `study/`: the offline benchmark (driver, database, selectors, analysis, figures).
 - `viewactive/`: the ViewActive reimplementation.

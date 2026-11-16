@@ -3,6 +3,11 @@ ensemble filter: verify object detections from a better viewpoint.
 
 See ``perception.client.Verifier``; ``python -m perception`` runs it on one frame.
 """
-from perception.client import HOUSEHOLD, Verdict, Verifier, View
-
 __all__ = ["HOUSEHOLD", "Verdict", "Verifier", "View"]
+
+
+def __getattr__(name):
+    if name in __all__:
+        from perception import client
+        return getattr(client, name)
+    raise AttributeError(name)

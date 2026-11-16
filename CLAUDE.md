@@ -16,6 +16,11 @@
    optional ensemble filter -> `vqf` or `top2gap` view -> SAM3. Keep it a
    single, simple API that a planner can call; evaluation code reuses
    `perception.select` rather than reimplementing the rules.
+   **Current goal: integrate it into ApexNav** (`~/codes/ApexNav`; datasets in `/ICONAS/users/marfred/apexnav_data`, replays and image tar in `/ICONAS/users/marfred/ApexNav`).
+   Whenever the ApexNav agent believes it has detected the target object, the
+   detection must first pass `perception.Verifier`; if it fails, it is treated
+   as a non-detection and the agent keeps exploring. This needs ApexNav's
+   ROS2/Habitat env and our `core`/`sam3d` envs to talk to each other.
 
 Everything in the repo should serve these goals. Remove outdated code and data
 rather than keeping parallel versions. Changes should make experimenting easy:
@@ -49,7 +54,10 @@ reusable plots, and all images, angles, and scores stored in the study database.
 
 - `perception/` is the runtime pipeline (two persistent model workers, one per
   env); `python -m perception` verifies one frame. `scripts/apexnav_fp.py`
-  evaluates it on ApexNav's false-positive episodes.
+  evaluates it on ApexNav's false-positive episodes. `python -m perception.server`
+  serves one `Verifier` over HTTP (port 8770) to ApexNav's `perception_gate`
+  package (ApexNav branch `perception-gate`; plan in
+  `docs/apexnav_integration_plan.md`).
 - `python -m study --config configs/<name>.yaml` runs render -> reconstruct ->
   score -> pick -> detect -> analyze. Stages resume. Outputs are in `outputs/<study>/`,
   with `study.sqlite` as the source of truth. See README.md. `outputs/` and
