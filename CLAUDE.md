@@ -1,4 +1,4 @@
-# CLAUDE.md
+# CLAUDE.md (ZSONverification, formerly 3DAwareVerification)
 
 ## Project goals
 
@@ -16,7 +16,7 @@
    optional ensemble filter -> `vqf` or `top2gap` view -> SAM3. Keep it a
    single, simple API that a planner can call; evaluation code reuses
    `perception.select` rather than reimplementing the rules.
-   **Current goal: integrate it into ApexNav** (`~/codes/ApexNav`; datasets in `/ICONAS/users/marfred/apexnav_data`, replays and image tar in `/ICONAS/users/marfred/ApexNav`).
+   **Current goal: integrate it into ApexNav** (submodule `planners/ApexNav`; datasets in `/ICONAS/users/marfred/apexnav_data`, replays and image tar in `/ICONAS/users/marfred/ApexNav`).
    Whenever the ApexNav agent believes it has detected the target object, the
    detection must first pass `perception.Verifier`; if it fails, it is treated
    as a non-detection and the agent keeps exploring. This needs ApexNav's
@@ -55,9 +55,20 @@ reusable plots, and all images, angles, and scores stored in the study database.
 - `perception/` is the runtime pipeline (two persistent model workers, one per
   env); `python -m perception` verifies one frame. `scripts/apexnav_fp.py`
   evaluates it on ApexNav's false-positive episodes. `python -m perception.server`
-  serves one `Verifier` over HTTP (port 8770) to ApexNav's `perception_gate`
-  package (ApexNav branch `perception-gate`; plan in
-  `docs/apexnav_integration_plan.md`).
+  serves one `Verifier` over HTTP (port 8772 for the ObjectNav runs, `--selector jev_sam3`).
+- `nav/` is the planner-agnostic navigation side (no ROS, no planner imports): `nav/gate`
+  (client, evidence, `VerificationGate`, closed-loop `LiveApproach`), `nav/approach`
+  (MPPI approach planner, decision flow), `nav/lastmile` (split navigator, medial
+  planner, episode collision map), `nav/eval` (run-format scoring: `closer_attrib`,
+  `nav_table`). `nav/README.md` is the API a planner adapter calls. Tests live next to
+  the code: `python -m unittest discover -s nav -t .` (core env, `PYTHONPATH=/workspace`;
+  `test_mppi_v15` takes ~1 min).
+- `planners/ApexNav` (git submodule, branch `zson`) holds only ApexNav-specific glue:
+  `habitat_evaluation.py` hooks, ROS messages, run scripts (`scripts/run_pool.sh`,
+  `run_worker.sh`, `stop_run.sh`, `zson.env` for the Verifier host and port), docker.
+  Its compose file mounts this repo at `/workspace/ZSONverification` (on `PYTHONPATH`).
+  Run outputs go to `planners/ApexNav/videos/<run>` (not tracked).
+  A new planner (VLFM) goes in `planners/<name>` and calls `nav.*` the same way.
 - `python -m study --config configs/<name>.yaml` runs render -> reconstruct ->
   score -> pick -> detect -> analyze. Stages resume. Outputs are in `outputs/<study>/`,
   with `study.sqlite` as the source of truth. See README.md. `outputs/` and

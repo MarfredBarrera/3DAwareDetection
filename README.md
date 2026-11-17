@@ -1,4 +1,4 @@
-# 3D-aware detection verification
+# ZSONverification: 3D-aware detection verification for zero-shot ObjectNav
 
 An object detector's false positives often come from a bad viewpoint. This
 repository verifies a detection by looking at the object from a better one:
@@ -15,7 +15,9 @@ repository verifies a detection by looking at the object from a better one:
    accepted when the top-1 category is the target.
 
 The end goal is to measure what this does for off-the-shelf zero-shot
-navigation (ObjectNav) planners such as ApexNav.
+navigation (ObjectNav) planners. `nav/` holds the planner-agnostic part (gate,
+closed-loop approach, last-mile navigation; its README is the API a planner
+calls) and `planners/ApexNav` (a git submodule) is the first planner wired to it.
 
 ## Setup
 
@@ -66,7 +68,7 @@ with Verifier(selector="vqf",              # or "top2gap"; "input" = SAM3 on the
   (about 11 s per verification with the filter, 7 s without, on this server).
   The `Verifier` can run inside the container, or on the host, where it starts
   its workers with `docker exec` into `$PERCEPTION_CONTAINER`
-  (default `3dawareverification-dev-1`); pass `launcher=[...]` for anything else.
+  (default `zsonverification-dev-1`); pass `launcher=[...]` for anything else.
   The client needs only numpy and Pillow, so the repo can be put on the
   planner's `PYTHONPATH`.
 
@@ -98,12 +100,11 @@ sam3d-env core python -m perception.server verify http://localhost:8770 \
   (base64 images) and returns `{ok, verdict, view_image}`, where `verdict` is
   `Verdict.summary()`. Malformed requests get a 400, verifier failures a 500,
   both with `{ok: false, error}`. `requests.jsonl` in `--log-dir` logs each one.
-- ApexNav reaches the dev container over its compose network:
-  `docker network connect 3dawareverification_default apexnav`, then
-  `http://3dawareverification-dev-1:8770`. ApexNav's `perception_gate/` package
-  holds the client and the gate (branch `perception-gate`; enable with
-  `VERIFICATION_GATE=true ./scripts/start_session.sh` and
-  `verification.enabled=true`). See `docs/apexnav_integration_plan.md`.
+- ApexNav reaches the dev container over its compose network
+  (`zsonverification_default`): `http://zsonverification-dev-1:<port>` (host and
+  port in `planners/ApexNav/scripts/zson.env`). The client and the gate are
+  `nav.gate`, see `nav/README.md`; enable them with `verification.enabled=true`
+  (and `VERIFICATION_GATE=true ./scripts/start_session.sh` in ApexNav).
 
 ### ApexNav false positives
 
