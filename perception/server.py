@@ -42,13 +42,6 @@ One ``Verifier`` with fixed settings per run; requests are served one at a time.
   ``words`` "approach" (default, HM3D words, ``jev.approach_opts``) or "gate" (``jev.name_opts``, then also the
   frozen gate's signals ``JevGate.assess``; ``gate`` is null for "approach"); with ``"sam3": true`` also the SAM3 scores /verify_views would compute for this view
   (over the body's ``vocabulary`` if given); ``"jev": false`` skips JEV (``jev`` and ``gate`` null).
-- ``POST /ask`` (selector jev_sam3) with the /verify body plus ``question`` and ``options`` (2-16 strings) ->
-  ``{ok, jev: {probabilities, options, latency_s, n_tokens}}``: JEV's choice about the outlined object
-  (``JevJudge.ask``; the active-approach pilot asks for its next move).
-- ``POST /embed`` (any selector) with ``{protocol, request_id?, images: [base64 image]}`` -> ``{ok,
-  embeddings}``: L2-normalised CLIP ViT-L/14 features of the whole frames (``Verifier.embed``), for
-  CLOSER's view-diversity gate (ApexNav ``perception_gate.diversity``). At most 16 images.
-
 ``--log-dir`` holds the worker logs and ``requests.jsonl`` (one line per request).
 """
 import argparse
@@ -70,7 +63,6 @@ from perception.qwen import D1_GATE
 from perception.images import decode, encode
 
 PROTOCOL = 1
-EMBED_MAX = 16          # images per /embed request
 VIEW_SIZE = (640, 480)  # /verify_views images: ApexNav's camera frames, never resized
 
 
@@ -192,10 +184,6 @@ class _Handler(BaseHTTPRequestHandler):
             return self._name()
         if self.path == "/detect":
             return self._detect()
-        if self.path == "/embed":
-            return self._embed()
-        if self.path == "/ask":
-            return self._ask()
         if self.path != "/verify":
             return self._reply(404, {"ok": False, "error": f"unknown path {self.path}"})
         start, record = time.time(), {"request_id": None}
@@ -249,66 +237,6 @@ class _Handler(BaseHTTPRequestHandler):
                           per_view=[{k: v[k] for k in ("step", "index", "label", "margin", "cached", "jev_cached", "probabilities",
                                                        "entropy", "contention", "score", "error") if k in v}
                                     for v in verdict.per_view])
-        record.update(status=status, error=reply.get("error"), latency_s=round(time.time() - start, 3))
-        self.server.log(record)
-        self._reply(status, reply)
-
-    def _ask(self):
-        """POST /ask (selector jev_sam3): the /verify body plus ``question`` and ``options`` -> {ok, jev:
-        {probabilities, options, latency_s, n_tokens}}: JEV's choice among ``options`` about the outlined object."""
-        start, record = time.time(), {"request_id": None, "path": "/ask"}
-        try:
-            body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
-            request = parse_request(body)
-            extra = json.loads(body)
-            question, options = extra.get("question"), extra.get("options")
-            if not isinstance(question, str) or not question:
-                raise BadRequest("question must be a non-empty string")
-            if not (isinstance(options, list) and 2 <= len(options) <= 16 and all(isinstance(o, str) for o in options)):
-                raise BadRequest("options must be a list of 2 to 16 strings")
-            record.update(request_id=request["request_id"], target=request["target"])
-            answer = self.server.verifier.ask_jev(request["image"], request["mask"], question, options)
-        except BadRequest as error:
-            status, reply = 400, {"ok": False, "error": str(error)}
-        except ValueError as error:
-            status, reply = 400, {"ok": False, "error": str(error)}
-        except Exception as error:
-            traceback.print_exc()
-            status, reply = 500, {"ok": False, "error": f"{type(error).__name__}: {error}"}
-        else:
-            status, reply = 200, {"ok": True, "jev": answer}
-            top = max(answer["probabilities"], key=answer["probabilities"].get)
-            record.update(top1=top, probabilities=answer["probabilities"])
-        record.update(status=status, error=reply.get("error"), latency_s=round(time.time() - start, 3))
-        self.server.log(record)
-        self._reply(status, reply)
-
-    def _embed(self):
-        """POST /embed: CLIP features of whole frames for the view-diversity gate."""
-        start, record = time.time(), {"request_id": None, "path": "/embed"}
-        try:
-            try:
-                request = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-            except ValueError as error:
-                raise BadRequest(f"body is not JSON: {error}")
-            if not isinstance(request, dict) or request.get("protocol") != PROTOCOL:
-                raise BadRequest(f"protocol must be {PROTOCOL}")
-            images = request.get("images")
-            if not isinstance(images, list) or not 1 <= len(images) <= EMBED_MAX:
-                raise BadRequest(f"images must be a list of 1 to {EMBED_MAX} base64 images")
-            try:
-                images = [decode(image) for image in images]
-            except Exception as error:
-                raise BadRequest(f"bad image: {type(error).__name__}: {error}")
-            record.update(request_id=request.get("request_id"), n_images=len(images))
-            embeddings = self.server.verifier.embed(images)
-        except BadRequest as error:
-            status, reply = 400, {"ok": False, "error": str(error)}
-        except Exception as error:
-            traceback.print_exc()
-            status, reply = 500, {"ok": False, "error": f"{type(error).__name__}: {error}"}
-        else:
-            status, reply = 200, {"ok": True, "embeddings": embeddings}
         record.update(status=status, error=reply.get("error"), latency_s=round(time.time() - start, 3))
         self.server.log(record)
         self._reply(status, reply)

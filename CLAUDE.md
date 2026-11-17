@@ -1,4 +1,4 @@
-# CLAUDE.md
+# CLAUDE.md (ZSONverification, formerly 3DAwareVerification)
 
 ## Project goals
 
@@ -16,7 +16,7 @@
    optional ensemble filter -> `vqf` or `top2gap` view -> SAM3. Keep it a
    single, simple API that a planner can call; evaluation code reuses
    `perception.select` rather than reimplementing the rules.
-   **Current goal: integrate it into ApexNav** (`~/codes/ApexNav`; datasets in `/ICONAS/users/marfred/apexnav_data`, replays and image tar in `/ICONAS/users/marfred/ApexNav`).
+   **Current goal: integrate it into ApexNav** (submodule `planners/ApexNav`; datasets in `/ICONAS/users/marfred/apexnav_data`, replays and image tar in `/ICONAS/users/marfred/ApexNav`).
    Whenever the ApexNav agent believes it has detected the target object, the
    detection must first pass `perception.Verifier`; if it fails, it is treated
    as a non-detection and the agent keeps exploring. This needs ApexNav's
@@ -55,15 +55,26 @@ reusable plots, and all images, angles, and scores stored in the study database.
 - `perception/` is the runtime pipeline (two persistent model workers, one per
   env); `python -m perception` verifies one frame. `scripts/apexnav_fp.py`
   evaluates it on ApexNav's false-positive episodes. `python -m perception.server`
-  serves one `Verifier` over HTTP (port 8770) to ApexNav's `perception_gate`
-  package (ApexNav branch `perception-gate`; plan in
-  `docs/apexnav_integration_plan.md`).
+  serves one `Verifier` over HTTP (port 8772 for the ObjectNav runs, `--selector jev_sam3`).
+- `nav/` is the planner-agnostic navigation side (no ROS, no planner imports): `nav/gate`
+  (client, evidence, `VerificationGate`, closed-loop `LiveApproach`), `nav/approach`
+  (MPPI approach planner, decision flow), `nav/lastmile` (split navigator, medial
+  planner, episode collision map), `nav/eval` (run-format scoring: `closer_attrib`,
+  `nav_table`). `nav/README.md` is the API a planner adapter calls. Tests live next to
+  the code: `python -m unittest discover -s nav -t .` (core env, `PYTHONPATH=/workspace`;
+  `test_mppi_v15` takes ~1 min).
+- `planners/ApexNav` (git submodule, branch `zson`) holds only ApexNav-specific glue:
+  `habitat_evaluation.py` hooks, ROS messages, run scripts (`scripts/run_pool.sh`,
+  `run_worker.sh`, `stop_run.sh`, `zson.env` for the Verifier host and port), docker.
+  Its compose file mounts this repo at `/workspace/ZSONverification` (on `PYTHONPATH`).
+  Run outputs go to `planners/ApexNav/videos/<run>` (not tracked).
+  A new planner (VLFM) goes in `planners/<name>` and calls `nav.*` the same way.
 - `python -m study --config configs/<name>.yaml` runs render -> reconstruct ->
   score -> pick -> detect -> analyze. Stages resume. Outputs are in `outputs/<study>/`,
   with `study.sqlite` as the source of truth. See README.md. `outputs/` and
   `data/` stay on the server; archive large finished datasets (e.g. completed
   render runs) to `/ICONAS/users/marfred/3DAwareVerification/` and delete the
-  local copy (home quota is 300 GB).
+  local copy (home quota is 200 GB).
 - New metric: register it in `study/ambiguity.py` and add it to the config's
   `ambiguity` section. New selector: `study/selectors.py`. New plot: compose
   `study.figures` panels. None of these needs new GPU work.
@@ -72,6 +83,8 @@ reusable plots, and all images, angles, and scores stored in the study database.
   `dev` container; the repo is mounted at `/workspace`.
 - Shared GPU server: check `nvidia-smi` and set `gpu_id` to an idle GPU before
   every GPU run.
+- Before renaming, deleting or changing the signature of shared code, re-index
+  with codebase-memory and check callers (`trace_path`); use grep otherwise.
 - Tests: `sam3d-env core python -m unittest discover -s tests`, plus
   `test_ambiguity.py`, `test_harness.py`, `test_viewactive.py` and
   `test_gt_error.py` in the `sam3d` env.

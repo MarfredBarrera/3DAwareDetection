@@ -1,9 +1,9 @@
 """CLOSER-style failure attribution computed only from simulator data (no eye labels).
 
-  python3 scripts/closer_attrib.py ARM [ARM ...] --episodes FILE [--per-episode OUT.tsv]
+  python3 -m nav.eval.closer_attrib ARM [ARM ...] --episodes FILE [--per-episode OUT.tsv]
             [--cand all|confident] [--min-goal-px N] [--merge-m 1.0]
 
-ARM is NAME=run1+run2 (run dirs under ~/codes/ApexNav/videos; the first run holding an episode
+ARM is NAME=run1+run2 (run dirs under planners/ApexNav/videos; the first run holding an episode
 wins; an episode counts only once its episodes.jsonl has a final line with "result").
 
 Every failed episode (Habitat success == 0) gets exactly one cause, in CLOSER's priority order
@@ -17,11 +17,11 @@ Every failed episode (Habitat success == 0) gets exactly one cause, in CLOSER's 
 category (HM3D annotations, logged per detection as `semantic_instances`).  See README block at the
 bottom of this file and docs in the module functions for per-arm field usage.
 """
-import argparse, csv, glob, json, math, os, sys
+import argparse, csv, glob, json, math, os
 from collections import Counter
 from math import comb
 
-V = os.path.expanduser("~/codes/ApexNav/videos/")
+V = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "planners", "ApexNav", "videos") + "/"
 LEDGER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "outputs", "apexnav_online", "labels", "ledger.tsv")
 STOP = 4  # FINAL_RESULT.REACH_OBJECT
 CAUSES = ["S", "FS", "FR", "EXPL", "OTHER"]

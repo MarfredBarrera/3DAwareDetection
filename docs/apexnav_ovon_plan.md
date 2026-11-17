@@ -1,3 +1,5 @@
+> Historical plan (2026-10). The scripts it names were replaced by `nav/eval` (closer_attrib, nav_table).
+
 # Plan: ApexNav closed-loop verification-gate study on HM3D-OVON val_unseen
 
 Written 2026-10-27 by the planning agent; user decisions: val_unseen, 200 episodes, 6 strategies
@@ -161,8 +163,8 @@ idle GPU (memory.used < 1000 MiB, no compute apps).
 ### 5.0 Cleanup (every GPU step)
 ```bash
 cleanup() {
-  docker exec 3dawareverification-dev-1 pkill -f perception.server
-  docker exec 3dawareverification-dev-1 pkill -f perception.worker
+  docker exec zsonverification-dev-1 pkill -f perception.server
+  docker exec zsonverification-dev-1 pkill -f perception.worker
   docker exec apexnav pkill -f habitat_evaluation.py
   docker exec apexnav tmux kill-session -t apexnav 2>/dev/null
   docker exec apexnav pkill -f 'vlm\.(detector|itm|segmentor)'

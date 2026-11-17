@@ -348,13 +348,6 @@ class JevJudge:
         text, options = naming_text(target, words)
         return self._choose(image, text, options)
 
-    def ask(self, image, question, options):
-        """JEV's distribution over ``options`` (at most 16) for a free ``question`` about the outlined frame
-        ``image`` (the "bare-v1" choice template; e.g. the approach pilot's next move)."""
-        if not 2 <= len(options) <= len(LETTERS):
-            raise ValueError(f"ask takes 2 to {len(LETTERS)} options")
-        return self._choose(image, decision_text("choice", [STATE, None], question, list(options)), list(options))
-
     def _choose(self, image, text, options):
         import torch
         start = time.perf_counter()

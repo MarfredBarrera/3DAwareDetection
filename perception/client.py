@@ -62,12 +62,11 @@ from perception.images import decode, encode
 from viewactive.grid import sam3d_to_viewactive
 
 WORKSPACE = Path(__file__).resolve().parents[1]
-CONTAINER = os.environ.get("PERCEPTION_CONTAINER", "3dawareverification-dev-1")
+CONTAINER = os.environ.get("PERCEPTION_CONTAINER", "zsonverification-dev-1")
 VIEWACTIVE = "/data/checkpoints/viewactive/blender_full_el0_45.pt"
 QWEN_ENV = "/data/envs/qwen"  # a venv in the container, not a sam3d-env env
 QWEN_GATE = "outputs/apexnav_offline/qwen_verification_pilot/frozen_gate.json"
 D1_EVIDENCE = ("grid", "input")
-CLIP_DIR = WORKSPACE / "data/models/clip"  # open_clip ViT-L/14 (openai) weights for embed()
 MULTIVIEW_MAX = 8                 # views per verify_views request
 MULTIVIEW_SAM3 = ("fallback", "always", "never")
 # ApexNav's six HM3D goals plus the object classes of mpcat40 (structure and
@@ -336,19 +335,6 @@ class Verifier:
         each with its mask and SAM3's score of every vocabulary word on that segment."""
         return self.sam3.call("candidates", image=encode(image), prompts=list(vocabulary or self.vocabulary),
                               words=list(words), min_score=min_score)
-
-    def ask_jev(self, image, mask, question, options):
-        """JEV's distribution over ``options`` for a free ``question`` about the masked object (selector
-        jev_sam3; e.g. the approach pilot's next move)."""
-        if self.jev is None:
-            raise ValueError(f"ask needs selector jev_sam3, not {self.selector!r}")
-        return self.jev.call("ask", image=encode(image), mask=encode(mask, "L"), question=question,
-                             options=list(options))
-
-    def embed(self, images):
-        """CLIP ViT-L/14 features (L2-normalised lists of floats) of whole frames, for CLOSER's
-        view-diversity gate (``perception_gate.diversity`` in ApexNav)."""
-        return self.sam3.call("embed", images=[encode(image) for image in images])
 
     def verify(self, image, mask, target, input_elevation=0.0, vocabulary=None):
         """Verify that the object under ``mask`` in ``image`` is a ``target``.

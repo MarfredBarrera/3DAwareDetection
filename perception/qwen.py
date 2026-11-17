@@ -53,7 +53,7 @@ class UncertaintyGate:
 
     @classmethod
     def load(cls, path):
-        """The gate frozen by ``scripts/qwen_verification_study.py prepare`` (frozen_gate.json)."""
+        """The gate frozen by the Qwen verification pilot (frozen_gate.json)."""
         import json
         frozen = json.loads(open(path).read())
         return cls(frozen["references"], frozen["thresholds"])

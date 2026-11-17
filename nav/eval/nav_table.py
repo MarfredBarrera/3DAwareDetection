@@ -1,12 +1,12 @@
 """Outcome table from the eye-verified ledger (outputs/apexnav_online/labels/ledger.tsv).
-  python scripts/nav_table.py RUN [RUN ...] [--episodes FILE | --common] [--md]
-RUN is a videos/ run name, or an arm: NAME=run1+run2 (or just run1+run2); first run holding the episode wins.
+  python -m nav.eval.nav_table RUN [RUN ...] [--episodes FILE | --common] [--md]
+RUN is a planners/ApexNav/videos/ run name, or an arm: NAME=run1+run2 (or just run1+run2); first run holding the episode wins.
 Arm aliases can also be defined in labels/arms.tsv (name<TAB>run1+run2+...).  --episodes FILE: whitespace/line separated ids.
 Only verified=eye rows count in the main columns; verified=auto rows are only reported in the 'unverif.' column; 'flagged' = eye rows with a doubt flag (borderline_1m, annotation_doubt, label_unsure).
 Two runs: McNemar on S (exact) and the discordant episodes."""
-import argparse, csv, os, sys
+import argparse, csv, os
 from math import comb
-LD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "outputs", "apexnav_online", "labels")
+LD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "outputs", "apexnav_online", "labels")
 COLS = ["n", "S", "FS-perc", "FR", "perc", "FS-nav", "NAV", "nav", "EXPL", "F?", "unverif.", "flagged", "S %"]
 
 def load():

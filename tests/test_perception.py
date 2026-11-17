@@ -678,9 +678,11 @@ class D1MultiviewTests(unittest.TestCase):
 OFFLINE = client.WORKSPACE / "outputs/apexnav_offline"
 PILOT_CSV = OFFLINE / "qwen_verification_pilot/per_request.csv"
 D1_DIR = OFFLINE / "qwen_all_requests_2026-11-03"
+D1_FRAMES = client.WORKSPACE / "outputs/apexnav_online/sync_2026-10-25"  # archived on the NAS
 
 
-@unittest.skipUnless(PILOT_CSV.exists() and (D1_DIR / "d1_gate.json").exists(), "offline D1 data not on this machine")
+@unittest.skipUnless(PILOT_CSV.exists() and (D1_DIR / "d1_gate.json").exists() and D1_FRAMES.exists(),
+                     "offline D1 data not on this machine")
 class D1ReplayTests(unittest.TestCase):
     """The frozen D1 gate and selector reproduce _compare.py on the 295 pilot requests."""
 
@@ -848,19 +850,6 @@ class ServerTests(unittest.TestCase):
         self.assertEqual((status, reply["ok"]), (400, False))
         self.assertIn("protocol", reply["error"])
         self.assertEqual(self.call("/nope")[0], 404)
-
-    def test_embed(self):
-        """POST /embed: CLIP features from the SAM3 worker (op embed), one per image."""
-        def fake(worker, op, **args):
-            if op != "embed":
-                raise AssertionError(op)
-            return [[1.0, 0.0]] * len(args["images"])
-        with patch.object(FakeWorker, "call", fake):
-            status, reply = self.call("/embed", {"protocol": self.server_module.PROTOCOL,
-                                                 "images": [encode(IMAGE)] * 2})
-        self.assertEqual((status, reply["embeddings"]), (200, [[1.0, 0.0]] * 2))
-        self.assertEqual(self.call("/embed", {"protocol": self.server_module.PROTOCOL, "images": []})[0], 400)
-        self.assertEqual(self.call("/embed", {"protocol": 0, "images": [encode(IMAGE)]})[0], 400)
 
     def test_views_request_cached_jev(self):
         frame = np.zeros((480, 640, 3), np.uint8)
@@ -1157,17 +1146,6 @@ class JevSam3Tests(unittest.TestCase):
         verdict = self.verifier.verify_views(images, masks, "couch", keys=keys, cached_jev={k: unsure for k in keys},
                                              cached_scores={k: {"couch": 0.7, "bed": 0.2, "chair": 0.0} for k in keys})
         self.assertEqual((verdict.status, len(FakeJev.calls), self.classified), ("correct", 1, []))
-
-    def test_ask_jev(self):
-        """The approach pilot's question goes to the JEV worker (op ask) with the outlined frame."""
-        asked = []
-        def call(op, **args):
-            asked.append((op, args["question"], args["options"]))
-            return {"probabilities": {"turn left": 0.2, "turn right": 0.1, "move forward": 0.7}, "options": args["options"]}
-        with patch.object(self.verifier.jev, "call", side_effect=call):
-            answer = self.verifier.ask_jev(FRAME, frame_mask(60), "Which move?", ["turn left", "turn right", "move forward"])
-        self.assertEqual((asked[0][0], answer["probabilities"]["move forward"]), ("ask", 0.7))
-        client.Verifier.ask_jev.__doc__  # documented
 
     def test_jev_gate_on_a_frame(self):
         """JEV's part (``_jev``): the gate's status and JEV's top-1 (armchair folded into chair)."""
