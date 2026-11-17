@@ -68,7 +68,7 @@ reusable plots, and all images, angles, and scores stored in the study database.
   `run_worker.sh`, `stop_run.sh`, `zson.env` for the Verifier host and port), docker.
   Its compose file mounts this repo at `/workspace/ZSONverification` (on `PYTHONPATH`).
   Run outputs go to `planners/ApexNav/videos/<run>` (not tracked).
-  A new planner (VLFM) goes in `planners/<name>` and calls `nav.*` the same way.
+  `planners/VLFM` (fork MarfredBarrera/vlfm, remote `upstream` = rai-opensource/vlfm; no hooks yet) goes the same way.
 - `python -m study --config configs/<name>.yaml` runs render -> reconstruct ->
   score -> pick -> detect -> analyze. Stages resume. Outputs are in `outputs/<study>/`,
   with `study.sqlite` as the source of truth. See README.md. `outputs/` and

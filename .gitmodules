@@ -2,3 +2,7 @@
 	path = planners/ApexNav
 	url = https://github.com/MarfredBarrera/ApexNav
 	branch = main
+[submodule "planners/VLFM"]
+	path = planners/VLFM
+	url = https://github.com/MarfredBarrera/vlfm
+	branch = main
