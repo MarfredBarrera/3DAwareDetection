@@ -678,9 +678,11 @@ class D1MultiviewTests(unittest.TestCase):
 OFFLINE = client.WORKSPACE / "outputs/apexnav_offline"
 PILOT_CSV = OFFLINE / "qwen_verification_pilot/per_request.csv"
 D1_DIR = OFFLINE / "qwen_all_requests_2026-11-03"
+D1_FRAMES = client.WORKSPACE / "outputs/apexnav_online/sync_2026-10-25"  # archived on the NAS
 
 
-@unittest.skipUnless(PILOT_CSV.exists() and (D1_DIR / "d1_gate.json").exists(), "offline D1 data not on this machine")
+@unittest.skipUnless(PILOT_CSV.exists() and (D1_DIR / "d1_gate.json").exists() and D1_FRAMES.exists(),
+                     "offline D1 data not on this machine")
 class D1ReplayTests(unittest.TestCase):
     """The frozen D1 gate and selector reproduce _compare.py on the 295 pilot requests."""
 
