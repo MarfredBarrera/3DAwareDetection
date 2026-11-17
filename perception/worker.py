@@ -90,28 +90,6 @@ class SAM3Server:
     def classify_views(self, images, prompts):
         return [self.classify(image, prompts) for image in images]
 
-    def embed(self, images):
-        """L2-normalised CLIP ViT-L/14 features of whole frames (CLOSER's diversity gate): one list of
-        floats per image. The model loads on first use (fp16, ~0.9 GB)."""
-        import torch
-
-        if getattr(self, "clip", None) is None:
-            import open_clip
-            from torchvision import transforms
-
-            from perception.client import CLIP_DIR
-            model = open_clip.create_model("ViT-L-14-quickgelu", pretrained="openai", cache_dir=str(CLIP_DIR))
-            self.clip = model.half().cuda().eval()
-            # the whole frame, squashed to 224 x 224 (no centre crop: truncation at the borders stays visible)
-            self.clip_preprocess = transforms.Compose([
-                transforms.Resize((224, 224), interpolation=transforms.InterpolationMode.BICUBIC),
-                transforms.ToTensor(),
-                transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))])
-        batch = torch.stack([self.clip_preprocess(decode(image)) for image in images]).half().cuda()
-        with torch.no_grad():
-            features = self.clip.encode_image(batch).float()
-        return torch.nn.functional.normalize(features, dim=-1).cpu().tolist()
-
     def segment(self, image, query, threshold=0.0, max_masks=1):
         """Up to ``max_masks`` SAM3 instances of ``query``, best first: [{mask, score, box}]."""
         frame = decode(image)
@@ -235,12 +213,6 @@ class JevServer:
 
         return self.model.choice(outlined(decode(image), decode(mask, "L")), target, words)
 
-    def ask(self, image, mask, question, options):
-        """JEV's distribution over ``options`` for ``question`` about the masked object (outlined in red):
-        ``perception.jev.JevJudge.ask``."""
-        from perception.qwen import outlined
-
-        return self.model.ask(outlined(decode(image), decode(mask, "L")), question, options)
 
 
 def main():
