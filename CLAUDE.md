@@ -63,7 +63,7 @@ reusable plots, and all images, angles, and scores stored in the study database.
   with `study.sqlite` as the source of truth. See README.md. `outputs/` and
   `data/` stay on the server; archive large finished datasets (e.g. completed
   render runs) to `/ICONAS/users/marfred/3DAwareVerification/` and delete the
-  local copy (home quota is 300 GB).
+  local copy (home quota is 200 GB).
 - New metric: register it in `study/ambiguity.py` and add it to the config's
   `ambiguity` section. New selector: `study/selectors.py`. New plot: compose
   `study.figures` panels. None of these needs new GPU work.
@@ -72,6 +72,8 @@ reusable plots, and all images, angles, and scores stored in the study database.
   `dev` container; the repo is mounted at `/workspace`.
 - Shared GPU server: check `nvidia-smi` and set `gpu_id` to an idle GPU before
   every GPU run.
+- Before renaming, deleting or changing the signature of shared code, re-index
+  with codebase-memory and check callers (`trace_path`); use grep otherwise.
 - Tests: `sam3d-env core python -m unittest discover -s tests`, plus
   `test_ambiguity.py`, `test_harness.py`, `test_viewactive.py` and
   `test_gt_error.py` in the `sam3d` env.
