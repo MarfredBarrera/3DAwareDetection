@@ -1,4 +1,4 @@
 [submodule "planners/ApexNav"]
 	path = planners/ApexNav
 	url = https://github.com/MarfredBarrera/ApexNav
-	branch = zson
+	branch = main

@@ -63,7 +63,7 @@ reusable plots, and all images, angles, and scores stored in the study database.
   `nav_table`). `nav/README.md` is the API a planner adapter calls. Tests live next to
   the code: `python -m unittest discover -s nav -t .` (core env, `PYTHONPATH=/workspace`;
   `test_mppi_v15` takes ~1 min).
-- `planners/ApexNav` (git submodule, branch `zson`) holds only ApexNav-specific glue:
+- `planners/ApexNav` (git submodule, branch `main`) holds only ApexNav-specific glue:
   `habitat_evaluation.py` hooks, ROS messages, run scripts (`scripts/run_pool.sh`,
   `run_worker.sh`, `stop_run.sh`, `zson.env` for the Verifier host and port), docker.
   Its compose file mounts this repo at `/workspace/ZSONverification` (on `PYTHONPATH`).
